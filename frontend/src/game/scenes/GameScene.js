@@ -1892,7 +1892,7 @@ export class GameScene extends Phaser.Scene {
         if (check === 'keg_multi_3' && this.kegMultiKills >= 1) completed = true
         if (check === 'gas_multi_5' && this.gasMultiHits >= 1) completed = true
         if (check === 'scout_kill_ogre' && this.scoutKilledOgre) completed = true
-        if (check === 'upgrade_catapult_3' && this.maxCatapultLevel >= 2) completed = true
+        if (check === 'upgrade_catapult_3' && this.maxCatapultLevel >= 3) completed = true
         if (check === 'repair_3' && this.towersRepaired >= 3) completed = true
         if (check === 'scout_kills_20' && this.scoutKills >= 20) completed = true
         if (check === 'all_gold_deposits') {
