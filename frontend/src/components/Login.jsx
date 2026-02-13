@@ -67,7 +67,7 @@ const styles = {
   },
 }
 
-export default function Login({ onLogin, apiBase }) {
+export default function Login({ onLogin, onPlayAsGuest, apiBase }) {
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -118,6 +118,15 @@ export default function Login({ onLogin, apiBase }) {
           {isRegister ? 'Already have an account? Login' : "Don't have an account? Register"}
         </button>
       </form>
+      <button
+        style={{ ...styles.button, marginTop: '1.5rem', width: '300px', background: '#0f3460' }}
+        onClick={onPlayAsGuest}
+      >
+        Play as Guest
+      </button>
+      <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.5rem' }}>
+        Guest mode — no cloud saves
+      </div>
     </div>
   )
 }

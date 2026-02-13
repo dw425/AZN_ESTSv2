@@ -32,7 +32,9 @@ export default function App() {
     setUser(null)
   }
 
-  if (loading) return null
+  const handlePlayAsGuest = () => {
+    setUser({ username: 'Guest', token: null, guest: true })
+  }
 
   return (
     <BrowserRouter basename="/AZN_ESTSv2">
@@ -42,7 +44,7 @@ export default function App() {
           element={
             user
               ? <Navigate to="/" />
-              : <Login onLogin={handleLogin} apiBase={API_BASE} />
+              : <Login onLogin={handleLogin} onPlayAsGuest={handlePlayAsGuest} apiBase={API_BASE} />
           }
         />
         <Route

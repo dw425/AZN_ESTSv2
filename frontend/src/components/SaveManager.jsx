@@ -1,22 +1,42 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 
+const LOCAL_SAVES_KEY = 'tnt_local_saves'
+
+function getLocalSaves() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_SAVES_KEY)) || []
+  } catch { return [] }
+}
+
+function setLocalSaves(saves) {
+  localStorage.setItem(LOCAL_SAVES_KEY, JSON.stringify(saves))
+}
+
 export default function SaveManager({ user, apiBase, game, onClose }) {
   const [saves, setSaves] = useState([])
   const [loading, setLoading] = useState(true)
+  const isGuest = !user.token
 
-  const headers = { Authorization: `Bearer ${user.token}` }
+  const headers = user.token ? { Authorization: `Bearer ${user.token}` } : {}
 
   useEffect(() => {
     loadSaves()
   }, [])
 
   const loadSaves = async () => {
+    if (isGuest) {
+      setSaves(getLocalSaves())
+      setLoading(false)
+      return
+    }
     try {
       const res = await axios.get(`${apiBase}/api/saves`, { headers })
       setSaves(res.data.saves || [])
     } catch (err) {
-      console.error('Failed to load saves:', err)
+      // Fall back to local saves if backend is unavailable
+      console.warn('Cloud saves unavailable, using local saves')
+      setSaves(getLocalSaves())
     }
     setLoading(false)
   }
@@ -27,34 +47,76 @@ export default function SaveManager({ user, apiBase, game, onClose }) {
       alert('No active game to save')
       return
     }
+
+    const newSave = {
+      id: Date.now().toString(),
+      name: `Save ${new Date().toLocaleString()}`,
+      data: gameState,
+      created_at: new Date().toISOString(),
+    }
+
+    if (isGuest) {
+      const local = getLocalSaves()
+      local.unshift(newSave)
+      setLocalSaves(local)
+      setSaves(local)
+      return
+    }
+
     try {
       await axios.post(`${apiBase}/api/saves`, {
-        name: `Save ${new Date().toLocaleString()}`,
+        name: newSave.name,
         data: gameState,
       }, { headers })
       loadSaves()
     } catch (err) {
-      console.error('Failed to save:', err)
+      // Fall back to local save
+      console.warn('Cloud save failed, saving locally')
+      const local = getLocalSaves()
+      local.unshift(newSave)
+      setLocalSaves(local)
+      setSaves(local)
     }
   }
 
-  const loadGame = async (saveId) => {
-    try {
-      const res = await axios.get(`${apiBase}/api/saves/${saveId}`, { headers })
-      game?.registry?.set('loadedState', res.data.save.data)
-      game?.scene?.start('GameScene', { loaded: true })
-      onClose()
-    } catch (err) {
-      console.error('Failed to load save:', err)
+  const loadGame = async (save) => {
+    let data = save.data
+
+    if (!isGuest && !save.local) {
+      try {
+        const res = await axios.get(`${apiBase}/api/saves/${save.id}`, { headers })
+        data = res.data.save.data
+      } catch (err) {
+        console.warn('Cloud load failed, using cached data')
+      }
     }
+
+    game?.registry?.set('loadedState', data)
+    game?.registry?.set('gameState', data)
+    // Go to level select so player can resume from their unlocked levels
+    game?.scene?.getScene('LevelSelectScene')?.scene?.start('LevelSelectScene')
+    if (!game?.scene?.getScene('LevelSelectScene')?.scene?.isActive('LevelSelectScene')) {
+      game?.scene?.start('LevelSelectScene')
+    }
+    onClose()
   }
 
   const deleteSave = async (saveId) => {
+    if (isGuest) {
+      const local = getLocalSaves().filter(s => s.id !== saveId)
+      setLocalSaves(local)
+      setSaves(local)
+      return
+    }
+
     try {
       await axios.delete(`${apiBase}/api/saves/${saveId}`, { headers })
       loadSaves()
     } catch (err) {
-      console.error('Failed to delete save:', err)
+      // Fall back to local delete
+      const local = getLocalSaves().filter(s => s.id !== saveId)
+      setLocalSaves(local)
+      setSaves(local)
     }
   }
 
@@ -65,6 +127,12 @@ export default function SaveManager({ user, apiBase, game, onClose }) {
           <h2 style={{ margin: 0, color: '#e94560' }}>Save / Load Game</h2>
           <button onClick={onClose} style={closeBtn}>X</button>
         </div>
+
+        {isGuest && (
+          <div style={{ fontSize: '0.8rem', color: '#f39c12', marginBottom: '0.75rem', padding: '8px', background: 'rgba(243,156,18,0.1)', borderRadius: '6px' }}>
+            Saves stored locally on this device. Login for cross-device cloud saves.
+          </div>
+        )}
 
         <button onClick={saveGame} style={saveBtn}>Save Current Game</button>
 
@@ -83,7 +151,7 @@ export default function SaveManager({ user, apiBase, game, onClose }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => loadGame(s.id)} style={loadBtn}>Load</button>
+                  <button onClick={() => loadGame(s)} style={loadBtn}>Load</button>
                   <button onClick={() => deleteSave(s.id)} style={delBtn}>Del</button>
                 </div>
               </div>
