@@ -1767,7 +1767,7 @@ export class GameScene extends Phaser.Scene {
               enemy._kamikazed = true
               this.kamikazeExplosion(enemy)
               this.damageEnemy(enemy, enemy.hp + 1) // Kill the rocket goblin
-              break
+              return // Skip remaining movement/HP bar code for destroyed enemy
             }
           }
         }
@@ -2680,7 +2680,7 @@ export class GameScene extends Phaser.Scene {
         target.hp -= 25
         target._damageTintTimer = 300
         target.sprite.setTint(0xff4444)
-        this.playSfx('sfx_storm_hit', 0.4)
+        this.playSfx('sfx_lightning', 0.4)
         // Beam visual
         const beam = this.add.graphics().setDepth(11)
         beam.lineStyle(3, 0xe74c3c, 0.8)
@@ -2865,6 +2865,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleGameOver(won) {
+    if (this.gameOver) return // Guard against duplicate calls in same frame
     this.gameOver = true
     this.startWaveBtn.setVisible(false)
     this.countdownText.setVisible(false)
