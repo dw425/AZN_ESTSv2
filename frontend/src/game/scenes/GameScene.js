@@ -945,6 +945,18 @@ export class GameScene extends Phaser.Scene {
     const maxTowerSize = 58
     const tScale = maxTowerSize / Math.max(sprite.width, sprite.height)
     sprite.setScale(tScale)
+    // Rescale on animation frame change — fire animation frames are 256x256 while base sprites
+    // are 60-110px; without this, the sprite pops to 3-4x size during fire animations
+    sprite.on('animationupdate', () => {
+      const fw = sprite.frame.realWidth || sprite.frame.width
+      const fh = sprite.frame.realHeight || sprite.frame.height
+      sprite.setScale(maxTowerSize / Math.max(fw, fh))
+    })
+    sprite.on('animationcomplete', () => {
+      const fw = sprite.frame.realWidth || sprite.frame.width
+      const fh = sprite.frame.realHeight || sprite.frame.height
+      sprite.setScale(maxTowerSize / Math.max(fw, fh))
+    })
     this.towerGroup.add(sprite)
 
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
@@ -1093,9 +1105,11 @@ export class GameScene extends Phaser.Scene {
             const newTex = def.textures[tower.level]
             if (this.textures.exists(newTex)) {
               tower.sprite.setTexture(newTex)
+              // Use raw frame dimensions (not display dimensions which include old scale)
               const maxSize = 58
-              const newScale = maxSize / Math.max(tower.sprite.width, tower.sprite.height)
-              tower.sprite.setScale(newScale)
+              const fw = tower.sprite.frame.realWidth || tower.sprite.frame.width
+              const fh = tower.sprite.frame.realHeight || tower.sprite.frame.height
+              tower.sprite.setScale(maxSize / Math.max(fw, fh))
             }
           }
           if (tower.type === 'catapult') this.maxCatapultLevel = Math.max(this.maxCatapultLevel, tower.level + 1)
@@ -1292,7 +1306,7 @@ export class GameScene extends Phaser.Scene {
 
     // Boss name plate
     if (def.boss) {
-      enemy.namePlate = this.add.text(start.x, start.y - spriteSize / 2 - 16, def.name, {
+      enemy.namePlate = this.add.text(start.x, start.y - sprite.displayHeight / 2 - 16, def.name, {
         fontSize: '10px', color: '#e74c3c', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(0.5).setDepth(9)
