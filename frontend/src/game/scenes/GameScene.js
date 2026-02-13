@@ -12,7 +12,9 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.levelIndex = data.levelIndex || 0
     this.endlessMode = data.endless || false
-    this.levelData = LEVELS[this.levelIndex]
+    // Deep-copy level data so endless mode waves.push() doesn't mutate the LEVELS array
+    const src = LEVELS[this.levelIndex]
+    this.levelData = { ...src, waves: src.waves.map(w => ({ ...w, enemies: [...w.enemies] })) }
     this.difficulty = data.difficulty || 'normal'
     this.endlessWaveNum = 0
 
