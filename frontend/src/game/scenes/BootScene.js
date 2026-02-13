@@ -69,25 +69,56 @@ export class BootScene extends Phaser.Scene {
     this.load.image('hud_no_cell', 'hud/nocellindicator-0.png')
     this.load.image('hud_target_arrow', 'hud/targetarrow-0.png')
 
-    // === Tower sprites (3 levels each) ===
+    // === Tower sprites (3 levels each + animation frames) ===
     this.load.image('tower_ballista', 'towers/ballista/ballista_l1-0.png')
+    this.load.image('tower_ballista_f1', 'towers/ballista/ballista_l1-1.png')
+    this.load.image('tower_ballista_f2', 'towers/ballista/ballista_l1-2.png')
     this.load.image('tower_ballista_2', 'towers/ballista/ballista_l2-0.png')
     this.load.image('tower_ballista_3', 'towers/ballista/ballista_l3-0.png')
+    this.load.image('tower_ballista_3_f1', 'towers/ballista/ballista_l3-1.png')
+    this.load.image('tower_ballista_3_f2', 'towers/ballista/ballista_l3-2.png')
+    this.load.image('tower_ballista_3_f3', 'towers/ballista/ballista_l3-3.png')
     this.load.image('tower_cannon', 'towers/cannon/cannon_l1-0.png')
+    this.load.image('tower_cannon_f1', 'towers/cannon/cannon_l1-1.png')
     this.load.image('tower_cannon_2', 'towers/cannon/cannon_l2-0.png')
+    this.load.image('tower_cannon_2_f1', 'towers/cannon/cannon_l2-1.png')
+    this.load.image('tower_cannon_2_f2', 'towers/cannon/cannon_l2-2.png')
     this.load.image('tower_cannon_3', 'towers/cannon/cannon_l3-0.png')
+    this.load.image('tower_cannon_3_f1', 'towers/cannon/cannon_l3-1.png')
+    this.load.image('tower_cannon_3_f2', 'towers/cannon/cannon_l3-2.png')
+    this.load.image('tower_cannon_3_f3', 'towers/cannon/cannon_l3-3.png')
     this.load.image('tower_catapult', 'towers/catapult/catapult_l1-0.png')
+    this.load.image('tower_catapult_f1', 'towers/catapult/catapult_l1-1.png')
+    this.load.image('tower_catapult_f2', 'towers/catapult/catapult_l1-2.png')
+    this.load.image('tower_catapult_f3', 'towers/catapult/catapult_l1-3.png')
+    this.load.image('tower_catapult_f4', 'towers/catapult/catapult_l1-4.png')
     this.load.image('tower_catapult_2', 'towers/catapult/catapult_l2-0.png')
+    this.load.image('tower_catapult_2_f1', 'towers/catapult/catapult_l2-1.png')
+    this.load.image('tower_catapult_2_f2', 'towers/catapult/catapult_l2-2.png')
+    this.load.image('tower_catapult_2_f3', 'towers/catapult/catapult_l2-3.png')
     this.load.image('tower_catapult_3', 'towers/catapult/catapult_l3-0.png')
+    this.load.image('tower_catapult_3_f1', 'towers/catapult/catapult_l3-1.png')
+    this.load.image('tower_catapult_3_f2', 'towers/catapult/catapult_l3-2.png')
+    this.load.image('tower_catapult_3_f3', 'towers/catapult/catapult_l3-3.png')
     this.load.image('tower_scout', 'towers/scout/scout_l1-0.png')
     this.load.image('tower_scout_2', 'towers/scout/scout_l2-0.png')
     this.load.image('tower_scout_3', 'towers/scout/scout_l3-0.png')
     this.load.image('tower_storm', 'towers/storm/storm_l1-0.png')
     this.load.image('tower_storm_2', 'towers/storm/storm_l2-0.png')
+    this.load.image('tower_storm_2_f1', 'towers/storm/storm_l2-1.png')
+    this.load.image('tower_storm_2_f2', 'towers/storm/storm_l2-2.png')
     this.load.image('tower_storm_3', 'towers/storm/storm_l3-0.png')
+    this.load.image('tower_storm_3_f1', 'towers/storm/storm_l3-1.png')
+    this.load.image('tower_storm_3_f2', 'towers/storm/storm_l3-2.png')
     this.load.image('tower_winter', 'towers/winter/winter_l1-0.png')
+    this.load.image('tower_winter_f1', 'towers/winter/winter_l1-1.png')
     this.load.image('tower_winter_2', 'towers/winter/winter_l2-0.png')
+    this.load.image('tower_winter_2_f1', 'towers/winter/winter_l2-1.png')
     this.load.image('tower_winter_3', 'towers/winter/winter_l3-0.png')
+    this.load.image('tower_winter_3_f1', 'towers/winter/winter_l3-1.png')
+
+    // Poison gas sprite
+    this.load.image('hud_poison_gas', 'hud/poisongas.png')
 
     // === Creep sprites (static + animation frames) ===
     this.load.image('creep_troll', 'creeps/troll/troll-0.png')
@@ -208,6 +239,29 @@ export class BootScene extends Phaser.Scene {
   }
 
   createAnimations() {
+    // Tower fire animations
+    const towerAnimDefs = [
+      { key: 'ballista_fire', frames: ['tower_ballista', 'tower_ballista_f1', 'tower_ballista_f2', 'tower_ballista'], rate: 10 },
+      { key: 'ballista_3_fire', frames: ['tower_ballista_3', 'tower_ballista_3_f1', 'tower_ballista_3_f2', 'tower_ballista_3_f3', 'tower_ballista_3'], rate: 10 },
+      { key: 'cannon_fire', frames: ['tower_cannon', 'tower_cannon_f1', 'tower_cannon'], rate: 8 },
+      { key: 'cannon_2_fire', frames: ['tower_cannon_2', 'tower_cannon_2_f1', 'tower_cannon_2_f2', 'tower_cannon_2'], rate: 8 },
+      { key: 'cannon_3_fire', frames: ['tower_cannon_3', 'tower_cannon_3_f1', 'tower_cannon_3_f2', 'tower_cannon_3_f3', 'tower_cannon_3'], rate: 8 },
+      { key: 'catapult_fire', frames: ['tower_catapult', 'tower_catapult_f1', 'tower_catapult_f2', 'tower_catapult_f3', 'tower_catapult_f4', 'tower_catapult'], rate: 12 },
+      { key: 'catapult_2_fire', frames: ['tower_catapult_2', 'tower_catapult_2_f1', 'tower_catapult_2_f2', 'tower_catapult_2_f3', 'tower_catapult_2'], rate: 12 },
+      { key: 'catapult_3_fire', frames: ['tower_catapult_3', 'tower_catapult_3_f1', 'tower_catapult_3_f2', 'tower_catapult_3_f3', 'tower_catapult_3'], rate: 12 },
+      { key: 'storm_2_fire', frames: ['tower_storm_2', 'tower_storm_2_f1', 'tower_storm_2_f2', 'tower_storm_2'], rate: 10 },
+      { key: 'storm_3_fire', frames: ['tower_storm_3', 'tower_storm_3_f1', 'tower_storm_3_f2', 'tower_storm_3'], rate: 10 },
+      { key: 'winter_fire', frames: ['tower_winter', 'tower_winter_f1', 'tower_winter'], rate: 8 },
+      { key: 'winter_2_fire', frames: ['tower_winter_2', 'tower_winter_2_f1', 'tower_winter_2'], rate: 8 },
+      { key: 'winter_3_fire', frames: ['tower_winter_3', 'tower_winter_3_f1', 'tower_winter_3'], rate: 8 },
+    ]
+    towerAnimDefs.forEach(def => {
+      const validFrames = def.frames.filter(f => this.textures.exists(f))
+      if (validFrames.length > 1) {
+        this.anims.create({ key: def.key, frames: validFrames.map(f => ({ key: f })), frameRate: def.rate, repeat: 0 })
+      }
+    })
+
     // Creep walk animations using individual loaded images
     const animDefs = [
       { key: 'troll_walk', prefix: 'creep_troll', frames: ['creep_troll', 'creep_troll_1', 'creep_troll_2'], rate: 6 },
