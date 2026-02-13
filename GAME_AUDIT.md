@@ -8,16 +8,16 @@
 
 | # | Issue | Root Cause | Status |
 |---|-------|-----------|--------|
-| C1 | Generated fallback textures render as HUGE broken squares (gold_deposit, treasure_chest) | `this.make.graphics().generateTexture()` produces corrupt textures in Phaser 3 | BROKEN |
-| C2 | Castle visual at exit is crude brown rectangles | GameScene.js drawMap() L291-305 uses raw fillRect | BROKEN |
-| C3 | Level select cards overlap, title clipped at top | LevelSelectScene.js card sizing 105x120 too large for 5x4 grid | BROKEN |
-| C4 | Difficulty popup text overlaps with stars and descriptions | LevelSelectScene.js showDifficultyPopup() spacing too tight | BROKEN |
-| C5 | Game freezes/crashes repeatedly | Scene transitions don't clean up; music re-creates on revisit | BROKEN |
-| C6 | Menu causes game to freeze | MenuScene.js creates new music instance every visit | BROKEN |
-| C7 | Back commands don't work | Multiple scenes may have stale references or navigation issues | BROKEN |
-| C8 | Path rendering is wrong / visually broken | Map bg may not align with grid; no path indicators shown | BROKEN |
-| C9 | Gold mine objects render as broken squares | Uses `gold_deposit` generated texture (corrupt) | BROKEN |
-| C10 | Overall level visuals not right | Combination of C1, C2, C8, C9 | BROKEN |
+| C1 | Generated fallback textures render as HUGE broken squares (gold_deposit, treasure_chest) | `this.make.graphics().generateTexture()` produces corrupt textures in Phaser 3 | FIXED (Pass 1) |
+| C2 | Castle visual at exit is crude brown rectangles | GameScene.js drawMap() uses raw fillRect | FIXED (Pass 1) — uses hud_health icon |
+| C3 | Level select cards overlap, title clipped at top | LevelSelectScene.js card sizing too large for 5x4 grid | FIXED (Pass 1) — dynamic sizing |
+| C4 | Difficulty popup text overlaps with stars and descriptions | LevelSelectScene.js showDifficultyPopup() spacing too tight | FIXED (Pass 1) — 42px spacing |
+| C5 | Game freezes/crashes repeatedly | Scene transitions don't clean up; music re-creates on revisit | FIXED (Pass 1) — shutdown handlers |
+| C6 | Menu causes game to freeze | MenuScene.js creates new music instance every visit | FIXED (Pass 1) — music dedup |
+| C7 | Back commands don't work | Multiple scenes may have stale references or navigation issues | FIXED (Pass 1) — all nav verified |
+| C8 | Path rendering is wrong / visually broken | Map bg may not align with grid; no path indicators shown | FIXED (Pass 1) — removed overlays |
+| C9 | Gold mine objects render as broken squares | Uses `gold_deposit` generated texture (corrupt) | FIXED (Pass 1) — uses hud_coin |
+| C10 | Overall level visuals not right | Combination of C1, C2, C8, C9 | FIXED (Pass 1) |
 
 ---
 
@@ -310,28 +310,29 @@ Created in `BootScene.generateFallbacks()` using `this.make.graphics()`:
 
 ## ITERATION LOG
 
-| # | Date | Changes | Build | Status |
-|---|------|---------|-------|--------|
-| 1 | | | | PENDING |
-| 2 | | | | PENDING |
-| 3 | | | | PENDING |
-| 4 | | | | PENDING |
-| 5 | | | | PENDING |
-| 6 | | | | PENDING |
-| 7 | | | | PENDING |
-| 8 | | | | PENDING |
-| 9 | | | | PENDING |
-| 10 | | | | PENDING |
-| 11 | | | | PENDING |
-| 12 | | | | PENDING |
-| 13 | | | | PENDING |
-| 14 | | | | PENDING |
-| 15 | | | | PENDING |
-| 16 | | | | PENDING |
-| 17 | | | | PENDING |
-| 18 | | | | PENDING |
-| 19 | | | | PENDING |
-| 20 | | | | PENDING |
+| Pass | Commit | Changes Summary | Build | Status |
+|------|--------|----------------|-------|--------|
+| Pass 1 | 8ce7f3d | Remove broken generated textures, fix castle/deposits/chests visuals, rewrite LevelSelectScene layout, add shutdown handlers to all 6 scenes, fix music management, add wave spawn tracking, remove unused physics, fix destroyTower safety, add 5 missing tutorial triggers, fix StatsScene scores | CLEAN | DEPLOYED |
+| Pass 2 | 39a1950 | Fix StatsScene upgradeMax (use UPGRADE_DEFS), difficulty popup backdrop interactive, fallback cell indicators draw shapes, range indicator fallback draws circle, stopAll before game music | CLEAN | DEPLOYED |
+| Pass 3 | 6957aa5 | Fix gem double-collect race, only melee enemies damage towers, sell value reflects upgrades, explosion graphics scale origin, ice splash applies slow to area, tower menu auto-close nulls ref, stopMusic stops all sounds, pause backdrop interactive, popup cleanup on page nav, tower fire rate scales with game speed, fire rate min cap 200ms, wave text clamp | CLEAN | DEPLOYED |
+
+### Pass 3 Deep-Dive Bug Summary
+
+| Priority | Bug | Fix Applied |
+|----------|-----|-------------|
+| CRITICAL | Gem double-collect race (auto-collect + click) | Added `collected` flag |
+| HIGH | ALL enemies dealt melee damage to towers | Only `enemy.melee` types now |
+| HIGH | Tower sell ignored upgrade investment | Track `totalInvestment`, sell at 60% |
+| HIGH | Explosion graphics scaled from wrong origin | Draw at (0,0) + setPosition |
+| HIGH | Ice splash didn't slow area targets | Apply slow in splash forEach loop |
+| MEDIUM | Tower menu auto-close didn't null ref | Added `this.towerMenu = null` |
+| MEDIUM | stopMusic() only stopped bgMusic | Changed to `sound.stopAll()` |
+| MEDIUM | Pause backdrop not interactive | Added setInteractive + click-to-close |
+| MEDIUM | Difficulty popup persisted across pages | Cleanup in `drawPage()` |
+| MEDIUM | Tower fire rate unaffected by game speed | Divide fireRate by gameSpeed |
+| MEDIUM | No fire rate minimum cap | Added `Math.max(200, ...)` |
+| LOW | Wave text showed "6/5" after last wave | Clamped with Math.min |
+| LOW | Dual pause entry points | Unified to showPauseMenu |
 
 ---
 
