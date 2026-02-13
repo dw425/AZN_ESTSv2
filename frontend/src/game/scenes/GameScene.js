@@ -864,6 +864,14 @@ export class GameScene extends Phaser.Scene {
       const radius = 80
       const damage = 150
 
+      // Layered explosion visual — inner core + outer blast + ring
+      const core = this.add.graphics().setDepth(12).setPosition(x, y)
+      core.fillStyle(0xffff00, 0.9)
+      core.fillCircle(0, 0, radius * 0.3)
+      this.tweens.add({
+        targets: core, alpha: 0, scaleX: 3, scaleY: 3, duration: 300,
+        onComplete: () => core.destroy(),
+      })
       const boom = this.add.graphics().setDepth(11).setPosition(x, y)
       boom.fillStyle(0xe74c3c, 0.6)
       boom.fillCircle(0, 0, radius)
@@ -871,6 +879,15 @@ export class GameScene extends Phaser.Scene {
         targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 500,
         onComplete: () => boom.destroy(),
       })
+      const ring = this.add.graphics().setDepth(11).setPosition(x, y)
+      ring.lineStyle(3, 0xff6600, 0.8)
+      ring.strokeCircle(0, 0, radius * 0.5)
+      this.tweens.add({
+        targets: ring, scaleX: 2, scaleY: 2, alpha: 0, duration: 400,
+        onComplete: () => ring.destroy(),
+      })
+      // Screen shake for explosions
+      this.cameras.main.shake(200, 0.005)
 
       let kegHits = 0
       this.enemies.forEach(enemy => {
@@ -889,10 +906,21 @@ export class GameScene extends Phaser.Scene {
       this.playSfx('sfx_dig')
       this.showTutorial('Tut_QuickUseMines')
       const mine = this.add.graphics().setDepth(3)
-      mine.fillStyle(0xf39c12, 0.7)
-      mine.fillCircle(0, 0, 8)
-      mine.lineStyle(1, 0x000000)
-      mine.strokeCircle(0, 0, 8)
+      // Metallic mine body
+      mine.fillStyle(0x8b4513, 0.9)
+      mine.fillCircle(0, 0, 10)
+      mine.fillStyle(0xf39c12, 0.8)
+      mine.fillCircle(0, 0, 7)
+      // Spikes around the mine
+      for (let a = 0; a < 6; a++) {
+        const angle = (a / 6) * Math.PI * 2
+        const sx = Math.cos(angle) * 11
+        const sy = Math.sin(angle) * 11
+        mine.fillStyle(0xc0392b, 0.9)
+        mine.fillCircle(sx, sy, 3)
+      }
+      mine.lineStyle(1.5, 0x333333)
+      mine.strokeCircle(0, 0, 10)
       mine.setPosition(x, y)
 
       this.deployables.push({
@@ -904,15 +932,32 @@ export class GameScene extends Phaser.Scene {
       this.weaponCharges.gas--
       this.playSfx('sfx_fuse')
       this.showTutorial('Tut_QuickUseGas')
-      let cloud
-      if (this.textures.exists('hud_poison_gas')) {
-        cloud = this.add.image(x, y, 'hud_poison_gas').setDisplaySize(120, 120).setDepth(3).setAlpha(0.5)
-      } else {
-        cloud = this.add.graphics().setDepth(3)
-        cloud.fillStyle(0x2ecc71, 0.3)
-        cloud.fillCircle(0, 0, 60)
-        cloud.setPosition(x, y)
-      }
+
+      // Layered gas cloud visual — outer haze + inner core + wisp particles
+      const cloudContainer = this.add.container(x, y).setDepth(3)
+      const outerHaze = this.add.graphics()
+      outerHaze.fillStyle(0x27ae60, 0.15)
+      outerHaze.fillCircle(0, 0, 70)
+      cloudContainer.add(outerHaze)
+      const innerCloud = this.add.graphics()
+      innerCloud.fillStyle(0x2ecc71, 0.35)
+      innerCloud.fillCircle(0, 0, 45)
+      cloudContainer.add(innerCloud)
+      const coreGlow = this.add.graphics()
+      coreGlow.fillStyle(0x1abc9c, 0.25)
+      coreGlow.fillCircle(0, 0, 25)
+      cloudContainer.add(coreGlow)
+
+      // Pulsing animation on inner cloud
+      this.tweens.add({
+        targets: innerCloud, scaleX: 1.15, scaleY: 1.15,
+        duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      })
+      // Slow rotation on outer haze
+      this.tweens.add({
+        targets: outerHaze, angle: 360,
+        duration: 4000, repeat: -1,
+      })
 
       // Count enemies in gas radius for bonus mission
       let gasHits = 0
@@ -925,13 +970,10 @@ export class GameScene extends Phaser.Scene {
       if (gasHits >= 5) this.gasMultiHits++
 
       const gasObj = {
-        type: 'gas', graphics: cloud, x, y,
+        type: 'gas', graphics: cloudContainer, x, y,
         radius: 60, dps: 30, timer: 5000, active: true,
       }
       this.deployables.push(gasObj)
-
-      // Visual fade tied to timer expiry (not a fixed tween) — updated in deployables loop
-      // The cloud alpha is managed in the gas processing code below
     }
 
     this.activeWeapon = null
@@ -1167,6 +1209,21 @@ export class GameScene extends Phaser.Scene {
     if (type === 'storm') this.stormTowersBuilt++
     if (type === 'winter') this.iceTowersBuilt++
 
+    // Placement animation — pop-in bounce
+    sprite.setScale(0)
+    this.tweens.add({
+      targets: sprite, scaleX: tScale, scaleY: tScale,
+      duration: 250, ease: 'Back.easeOut',
+    })
+    // Dust puff at base
+    const dustPuff = this.add.graphics().setDepth(3).setPosition(x, y + 20)
+    dustPuff.fillStyle(0xccaa77, 0.4)
+    dustPuff.fillCircle(0, 0, 15)
+    this.tweens.add({
+      targets: dustPuff, scaleX: 2, scaleY: 0.5, alpha: 0,
+      duration: 300, onComplete: () => dustPuff.destroy(),
+    })
+
     // Check rune boosts for nearby towers
     this.specialTiles.runes.forEach(rune => {
       const rdx = Math.abs(rune.c - col)
@@ -1334,7 +1391,26 @@ export class GameScene extends Phaser.Scene {
     sellBtn.on('pointerdown', () => {
       this.gold += sellValue
       this.showFloatingText(tower.x, tower.y - 20, `+$${sellValue}`, '#f1c40f')
-      tower.sprite.destroy()
+      // Sell animation — shrink + gold sparkles
+      const tx = tower.x, ty = tower.y
+      this.tweens.add({
+        targets: tower.sprite, scaleX: 0, scaleY: 0, alpha: 0,
+        duration: 200, ease: 'Back.easeIn',
+        onComplete: () => { try { tower.sprite.destroy() } catch (e) {} },
+      })
+      for (let s = 0; s < 5; s++) {
+        const spark = this.add.graphics().setDepth(10).setPosition(tx, ty)
+        spark.fillStyle(0xf1c40f, 0.8)
+        spark.fillCircle(0, 0, 3)
+        this.tweens.add({
+          targets: spark,
+          x: tx + (Math.random() - 0.5) * 50,
+          y: ty - 20 - Math.random() * 30,
+          alpha: 0, duration: 400,
+          delay: s * 40,
+          onComplete: () => spark.destroy(),
+        })
+      }
       tower.hpBg.destroy()
       tower.hpBar.destroy()
       this.towers = this.towers.filter(t => t !== tower)
@@ -1367,6 +1443,22 @@ export class GameScene extends Phaser.Scene {
     this.countdownText.setVisible(false)
 
     const wave = this.levelData.waves[this.currentWave]
+
+    // Wave start notification
+    if (!wave.boss) {
+      const waveLabel = this.endlessMode
+        ? `\u221E WAVE ${this.currentWave + 1}`
+        : `WAVE ${this.currentWave + 1}/${this.levelData.waves.length}`
+      const waveText = this.add.text(
+        this.cameras.main.centerX, this.cameras.main.centerY - 50,
+        waveLabel, { fontSize: '20px', color: '#fff', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }
+      ).setOrigin(0.5).setDepth(30).setAlpha(0)
+      this.tweens.add({
+        targets: waveText, alpha: 1, duration: 200,
+        yoyo: true, hold: 800,
+        onComplete: () => waveText.destroy(),
+      })
+    }
 
     // Boss wave warning
     if (wave.boss) {
@@ -1451,6 +1543,12 @@ export class GameScene extends Phaser.Scene {
     if (hasAnim && sprite.play) {
       try { sprite.play(animKey) } catch (e) {}
     }
+
+    // Spawn fade-in
+    sprite.setAlpha(0)
+    this.tweens.add({
+      targets: sprite, alpha: 1, duration: 200,
+    })
 
     // Boss tint (reddish glow)
     if (def.boss) {
@@ -1871,14 +1969,29 @@ export class GameScene extends Phaser.Scene {
             dep.active = false
             dep.graphics.destroy()
             this.playSfx('sfx_mine_explode')
-            // Explosion visual
-            const boom = this.add.graphics().setDepth(11)
-            boom.fillStyle(0xf39c12, 0.5)
-            boom.fillCircle(dep.x, dep.y, dep.radius)
+            // Layered mine explosion — flash + blast + shrapnel ring
+            const mFlash = this.add.graphics().setDepth(12).setPosition(dep.x, dep.y)
+            mFlash.fillStyle(0xffffff, 0.8)
+            mFlash.fillCircle(0, 0, dep.radius * 0.3)
             this.tweens.add({
-              targets: boom, alpha: 0, duration: 400,
-              onComplete: () => boom.destroy(),
+              targets: mFlash, alpha: 0, scaleX: 2.5, scaleY: 2.5, duration: 200,
+              onComplete: () => mFlash.destroy(),
             })
+            const mBoom = this.add.graphics().setDepth(11).setPosition(dep.x, dep.y)
+            mBoom.fillStyle(0xf39c12, 0.6)
+            mBoom.fillCircle(0, 0, dep.radius * 0.7)
+            this.tweens.add({
+              targets: mBoom, alpha: 0, scaleX: 1.4, scaleY: 1.4, duration: 400,
+              onComplete: () => mBoom.destroy(),
+            })
+            const mRing = this.add.graphics().setDepth(11).setPosition(dep.x, dep.y)
+            mRing.lineStyle(2, 0xd35400, 0.7)
+            mRing.strokeCircle(0, 0, dep.radius * 0.4)
+            this.tweens.add({
+              targets: mRing, scaleX: 2.2, scaleY: 2.2, alpha: 0, duration: 350,
+              onComplete: () => mRing.destroy(),
+            })
+            this.cameras.main.shake(150, 0.003)
             this.enemies.forEach(e => {
               if (!e.sprite.active) return
               const edx = e.sprite.x - dep.x
@@ -1902,14 +2015,34 @@ export class GameScene extends Phaser.Scene {
         }
         // Fade visual alpha proportional to remaining time
         const alphaRatio = Math.max(0, dep.timer / 5000)
-        try { dep.graphics.setAlpha(0.5 * alphaRatio) } catch (e) {}
-        // Track enemies hit during the cloud's lifetime for bonus mission
+        try { dep.graphics.setAlpha(alphaRatio) } catch (e) {}
+
+        // Occasional poison bubble particles
+        dep._bubbleTimer = (dep._bubbleTimer || 0) + speedDelta
+        if (dep._bubbleTimer > 400) {
+          dep._bubbleTimer = 0
+          const bx = dep.x + (Math.random() - 0.5) * 80
+          const by = dep.y + (Math.random() - 0.5) * 80
+          const bubble = this.add.graphics().setDepth(4).setPosition(bx, by)
+          bubble.fillStyle(0x2ecc71, 0.5)
+          bubble.fillCircle(0, 0, 3 + Math.random() * 4)
+          this.tweens.add({
+            targets: bubble, y: by - 20 - Math.random() * 15, alpha: 0,
+            duration: 600 + Math.random() * 300,
+            onComplete: () => bubble.destroy(),
+          })
+        }
+
+        // Damage + slow enemies inside gas cloud
         this.enemies.forEach(enemy => {
           if (!enemy.sprite.active) return
           const dx = enemy.sprite.x - dep.x
           const dy = enemy.sprite.y - dep.y
           if (Math.sqrt(dx * dx + dy * dy) <= dep.radius) {
             this.damageEnemy(enemy, (dep.dps * speedDelta) / 1000)
+            // Gas slows enemies by 40%
+            enemy.slowTimer = Math.max(enemy.slowTimer || 0, 500)
+            enemy.slowFactor = Math.min(enemy.slowFactor || 1, 0.6)
           }
         })
         return true
@@ -2091,8 +2224,7 @@ export class GameScene extends Phaser.Scene {
     this.damageEnemy(primary, tower.damage, tower.type)
 
     const bolt = this.add.graphics().setDepth(11)
-    bolt.lineStyle(2, 0x9b59b6, 0.8)
-    bolt.lineBetween(tower.x, tower.y, primary.sprite.x, primary.sprite.y)
+    this.drawLightningBolt(bolt, tower.x, tower.y, primary.sprite.x, primary.sprite.y, 0x9b59b6)
 
     const hit = new Set([primary])
     let lastX = primary.sprite.x
@@ -2121,8 +2253,7 @@ export class GameScene extends Phaser.Scene {
       hit.add(nearest)
       this.damageEnemy(nearest, chainDamage, tower.type)
 
-      bolt.lineStyle(Math.max(1, 2 - chain * 0.4), 0x9b59b6, 0.6 - chain * 0.1)
-      bolt.lineBetween(lastX, lastY, nearest.sprite.x, nearest.sprite.y)
+      this.drawLightningBolt(bolt, lastX, lastY, nearest.sprite.x, nearest.sprite.y, 0x7b4fb6, Math.max(1, 2 - chain * 0.4))
 
       lastX = nearest.sprite.x
       lastY = nearest.sprite.y
@@ -2479,6 +2610,7 @@ export class GameScene extends Phaser.Scene {
           alpha: 0, duration: 400, onComplete: () => ring.destroy(),
         })
         this.showFloatingText(ex, ey - 30, 'GROUND SLAM!', '#f39c12')
+        this.cameras.main.shake(300, 0.008)
       }
     } else if (enemy.bossAbility === 'fire_breath') {
       // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
@@ -2734,10 +2866,14 @@ export class GameScene extends Phaser.Scene {
       titleColor = won ? (stars === 3 ? '#f1c40f' : '#2ecc71') : '#e74c3c'
     }
 
-    this.add.text(cx, cy - 80, title, {
+    const titleText = this.add.text(cx, cy - 80, title, {
       fontSize: '48px', color: titleColor, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(51)
+    }).setOrigin(0.5).setDepth(51).setScale(0)
+    this.tweens.add({
+      targets: titleText, scaleX: 1, scaleY: 1,
+      duration: 400, ease: 'Back.easeOut',
+    })
 
     if (this.endlessMode) {
       this.add.text(cx, cy - 45, `Survived ${this.currentWave} waves!`, {
@@ -2751,11 +2887,17 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < 3; i++) {
         const starX = cx - 40 + i * 40
         const filled = i < stars
-        this.add.text(starX, cy - 40, filled ? '\u2605' : '\u2606', {
+        const star = this.add.text(starX, cy - 40, filled ? '\u2605' : '\u2606', {
           fontSize: '32px',
           color: filled ? '#f1c40f' : '#555',
           stroke: '#000', strokeThickness: 2,
-        }).setOrigin(0.5).setDepth(51)
+        }).setOrigin(0.5).setDepth(51).setScale(0)
+        // Staggered star reveal animation
+        this.tweens.add({
+          targets: star, scaleX: 1, scaleY: 1,
+          duration: 300, ease: 'Back.easeOut',
+          delay: 400 + i * 200,
+        })
       }
     } else {
       // Show defeat quote
@@ -2847,6 +2989,24 @@ export class GameScene extends Phaser.Scene {
         }
       })
     }
+  }
+
+  drawLightningBolt(graphics, x1, y1, x2, y2, color, width) {
+    graphics.lineStyle(width || 2, color || 0x9b59b6, 0.8)
+    const segments = 6
+    const dx = x2 - x1, dy = y2 - y1
+    let px = x1, py = y1
+    graphics.beginPath()
+    graphics.moveTo(px, py)
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments
+      const bx = x1 + dx * t + Phaser.Math.Between(-12, 12)
+      const by = y1 + dy * t + Phaser.Math.Between(-12, 12)
+      graphics.lineTo(bx, by)
+      px = bx; py = by
+    }
+    graphics.lineTo(x2, y2)
+    graphics.strokePath()
   }
 
   generateEndlessWave(waveNum) {
