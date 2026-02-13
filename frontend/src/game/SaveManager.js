@@ -119,7 +119,7 @@ export const UPGRADE_DEFS = {
   },
   powderKegBoost: {
     name: 'Pyromaniac',
-    desc: '+powder keg damage',
+    desc: '+1 powder keg charge',
     baseCost: 100,
     costInc: 25,
     maxLevel: 10,
@@ -127,7 +127,7 @@ export const UPGRADE_DEFS = {
   },
   gasCloudBoost: {
     name: 'Toxic Avenger',
-    desc: '+poison gas damage',
+    desc: '+1 gas cloud charge',
     baseCost: 100,
     costInc: 25,
     maxLevel: 10,
