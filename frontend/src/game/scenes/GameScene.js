@@ -251,7 +251,8 @@ export class GameScene extends Phaser.Scene {
       // Stop only background music, not SFX
       this.stopMusic()
       if (this.cache.audio.exists(musicKey)) {
-        this.bgMusic = this.sound.add(musicKey, { loop: true, volume: 0.3 })
+        const musicVol = this.saveData.settings ? this.saveData.settings.musicVolume : 0.3
+        this.bgMusic = this.sound.add(musicKey, { loop: true, volume: musicVol })
         this.bgMusic.play()
       }
     } catch (e) {
@@ -665,12 +666,14 @@ export class GameScene extends Phaser.Scene {
   playSfx(key, volume) {
     try {
       if (this.cache.audio.exists(key)) {
-        this.sound.play(key, { volume: volume || 0.4 })
+        const sfxVol = this.saveData.settings ? this.saveData.settings.sfxVolume : 0.5
+        this.sound.play(key, { volume: (volume || 0.4) * sfxVol })
       }
     } catch (e) { /* audio not available */ }
   }
 
   showTutorial(tutId) {
+    if (this.saveData.settings && !this.saveData.settings.showTutorials) return
     if (hasTutorialSeen(tutId)) return
     const tut = TUTORIALS[tutId]
     if (!tut) return
@@ -1296,7 +1299,7 @@ export class GameScene extends Phaser.Scene {
       yOffset += 18
     }
 
-    const sellValue = Math.floor(tower.totalInvestment * 0.6)
+    const sellValue = Math.floor(tower.totalInvestment * 0.7)
     if (this.textures.exists('hud_sell')) {
       menu.add(this.add.image(25, yOffset - 11, 'hud_sell').setDisplaySize(14, 14))
     }
@@ -2140,11 +2143,12 @@ export class GameScene extends Phaser.Scene {
     enemy.hp -= damage
 
     // Damage number float (only for significant hits) — tint based on resistance
+    const showDmgNums = !this.saveData.settings || this.saveData.settings.showDamageNumbers !== false
     const resisted = towerType && TOWER_TYPES[towerType] && (
       (TOWER_TYPES[towerType].damageType === 'physical' && enemy.physResist > 0) ||
       (TOWER_TYPES[towerType].damageType === 'magical' && enemy.magResist > 0)
     )
-    if (damage >= 10 || resisted) {
+    if (showDmgNums && (damage >= 10 || resisted)) {
       const dmgColor = resisted ? '#888' : '#fff'
       const dmgText = this.add.text(enemy.sprite.x + Phaser.Math.Between(-8, 8), enemy.sprite.y - 15, Math.round(damage), {
         fontSize: resisted ? '9px' : '10px', color: dmgColor,

@@ -10,6 +10,12 @@ const DEFAULT_SAVE = {
   tutorialsSeen: {},     // e.g. { "Tut_PlaceBallista": true }
   totalKills: 0,
   totalGemsEarned: 0,
+  settings: {
+    musicVolume: 0.3,
+    sfxVolume: 0.5,
+    showDamageNumbers: true,
+    showTutorials: true,
+  },
   upgrades: {
     goldStartBoost: 0,
     goldWaveBoost: 0,

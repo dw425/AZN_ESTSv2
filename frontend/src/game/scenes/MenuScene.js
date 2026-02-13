@@ -72,15 +72,26 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('StatsScene')
     })
 
+    // Settings button
+    const settingsBtn = this.add.text(cx, cy + 145, 'SETTINGS', {
+      fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold',
+      color: '#aaa', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+    settingsBtn.on('pointerover', () => settingsBtn.setColor('#fff'))
+    settingsBtn.on('pointerout', () => settingsBtn.setColor('#aaa'))
+    settingsBtn.on('pointerdown', () => {
+      this.scene.start('SettingsScene')
+    })
+
     // Credits
-    this.add.text(cx, cy + 150, 'Inspired by Towers N\' Trolls by Ember Entertainment', {
+    this.add.text(cx, cy + 180, 'Inspired by Towers N\' Trolls by Ember Entertainment', {
       fontSize: '12px',
       color: '#aaa',
       stroke: '#000',
       strokeThickness: 2,
     }).setOrigin(0.5)
 
-    this.add.text(cx, h - 20, 'v2.0.0 | Web Edition', {
+    this.add.text(cx, h - 15, 'v2.0.0 | Web Edition', {
       fontSize: '11px',
       color: '#666',
       stroke: '#000',
