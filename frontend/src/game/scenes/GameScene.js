@@ -562,7 +562,7 @@ export class GameScene extends Phaser.Scene {
       fontSize: '14px', color: '#aaa',
     }).setDepth(16)
 
-    // Speed controls using HUD icons
+    // Speed controls — 1x / 2x / 3x cycle + pause
     const speedX = w - 150
     if (this.textures.exists('hud_play')) {
       this.playBtn = this.add.image(speedX, 18, 'hud_play')
@@ -576,8 +576,15 @@ export class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.setSpeed(2))
     }
+    // 3x speed button
+    this.tripleBtn = this.add.text(speedX + 56, 18, '3x', {
+      fontSize: '12px', color: '#888', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(16)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.setSpeed(3))
     if (this.textures.exists('hud_pause')) {
-      this.pauseBtn = this.add.image(speedX + 56, 18, 'hud_pause')
+      this.pauseBtn = this.add.image(speedX + 82, 18, 'hud_pause')
         .setDisplaySize(22, 22).setDepth(16)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.showPauseMenu())
@@ -602,10 +609,15 @@ export class GameScene extends Phaser.Scene {
   setSpeed(speed) {
     this.gameSpeed = speed
     this.time.timeScale = speed
-    // Update button visuals
+    // Update button visuals — highlight active speed
+    if (this.playBtn) this.playBtn.setAlpha(speed === 1 ? 1 : 0.4)
     if (this.ffBtn) {
+      this.ffBtn.setAlpha(speed === 2 ? 1 : 0.4)
       const ffKey = speed === 2 ? 'hud_ff_on' : 'hud_ff'
       if (this.textures.exists(ffKey)) this.ffBtn.setTexture(ffKey)
+    }
+    if (this.tripleBtn) {
+      this.tripleBtn.setColor(speed === 3 ? '#ff4500' : '#888')
     }
   }
 
@@ -1202,6 +1214,7 @@ export class GameScene extends Phaser.Scene {
       hpBar,
       autoHealRate: (this.saveData.upgrades.towerAutoHealBoost || 0) * 0.5,
       totalInvestment: def.cost,
+      targetMode: 'first', // first | strong | weak | close
     }
 
     this.towers.push(tower)
@@ -1298,24 +1311,40 @@ export class GameScene extends Phaser.Scene {
     this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
     this.rangeIndicator.setVisible(true)
 
-    const menuH = 45 + (upgrade ? 25 : 0) + (needsRepair ? 20 : 0)
-    const menu = this.add.container(tower.x, tower.y - 50).setDepth(30)
+    const menuH = 60 + (upgrade ? 25 : 0) + (needsRepair ? 20 : 0)
+    const menu = this.add.container(tower.x, tower.y - 55).setDepth(30)
 
     const bg = this.add.graphics()
     bg.fillStyle(0x16213e, 0.95)
-    bg.fillRoundedRect(-90, -25, 180, menuH, 8)
+    bg.fillRoundedRect(-90, -30, 180, menuH, 8)
     bg.lineStyle(1, 0xe94560)
-    bg.strokeRoundedRect(-90, -25, 180, menuH, 8)
+    bg.strokeRoundedRect(-90, -30, 180, menuH, 8)
     menu.add(bg)
 
     const hpPct = Math.round(tower.hp / tower.maxHp * 100)
     const dmgLabel = def.damageType === 'physical' ? '\u2694' : '\u2728' // sword or sparkles
-    const info = this.add.text(0, -15, `${def.name} Lv${tower.level + 1} ${dmgLabel} | DMG:${tower.damage} | HP:${hpPct}%`, {
+    const info = this.add.text(0, -20, `${def.name} Lv${tower.level + 1} ${dmgLabel} | DMG:${tower.damage} | HP:${hpPct}%`, {
       fontSize: '10px', color: '#fff',
     }).setOrigin(0.5)
     menu.add(info)
 
-    let yOffset = 5
+    // Targeting priority cycle button
+    const targetModes = ['first', 'strong', 'weak', 'close']
+    const targetLabels = { first: 'First', strong: 'Strong', weak: 'Weak', close: 'Close' }
+    const targetColors = { first: '#3498db', strong: '#e74c3c', weak: '#2ecc71', close: '#f1c40f' }
+    const targetBtn = this.add.text(0, -5, `Target: ${targetLabels[tower.targetMode]}`, {
+      fontSize: '10px', color: targetColors[tower.targetMode], fontStyle: 'bold',
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+    targetBtn.on('pointerdown', () => {
+      const idx = targetModes.indexOf(tower.targetMode)
+      tower.targetMode = targetModes[(idx + 1) % targetModes.length]
+      targetBtn.setText(`Target: ${targetLabels[tower.targetMode]}`)
+      targetBtn.setColor(targetColors[tower.targetMode])
+      this.playSfx('sfx_beep', 0.2)
+    })
+    menu.add(targetBtn)
+
+    let yOffset = 10
     if (upgrade) {
       if (this.textures.exists('hud_upgrade')) {
         menu.add(this.add.image(-55, yOffset + 7, 'hud_upgrade').setDisplaySize(14, 14))
@@ -1565,12 +1594,16 @@ export class GameScene extends Phaser.Scene {
     const hpBg = this.add.graphics().setDepth(def.flying ? 9 : 7)
     const hpBar = this.add.graphics().setDepth(def.flying ? 10 : 8)
 
-    const scaledHp = Math.round(def.hp * this.diffMult.enemyHp)
-    const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed)
+    // In endless mode, scale enemy stats progressively with wave number
+    const endlessScale = this.endlessMode ? 1 + this.endlessWaveNum * 0.08 : 1
+    const scaledHp = Math.round(def.hp * this.diffMult.enemyHp * endlessScale)
+    const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed * Math.min(endlessScale, 1.5))
 
     // Flying enemies take a direct path (spawn → exit), bypassing the winding ground path
     const isFlying = def.flying || false
     const flyingWaypoints = isFlying ? [this.waypoints[0], this.waypoints[this.waypoints.length - 1]] : null
+
+    const scaledReward = this.endlessMode ? Math.round(def.reward * (1 + this.endlessWaveNum * 0.03)) : def.reward
 
     const enemy = {
       sprite, hpBg, hpBar, type,
@@ -1578,7 +1611,7 @@ export class GameScene extends Phaser.Scene {
       maxHp: scaledHp,
       baseSpeed: scaledSpeed,
       speed: scaledSpeed,
-      reward: def.reward,
+      reward: scaledReward,
       damage: def.damage,
       waypointIndex: 0,
       slowTimer: 0,
@@ -1855,9 +1888,10 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Default targeting: "first" — the enemy furthest along the path
+      // Targeting by tower's selected priority mode
       if (!bestTarget) {
-        let bestPriority = -1
+        let bestScore = -Infinity
+        const mode = tower.targetMode || 'first'
         this.enemies.forEach(enemy => {
           if (!enemy.sprite.active) return
           if (enemy.flying && !canTargetFlying) return
@@ -1865,10 +1899,19 @@ export class GameScene extends Phaser.Scene {
           const dy = enemy.sprite.y - tower.y
           const dist = Math.sqrt(dx * dx + dy * dy)
           if (dist <= tower.range) {
-            const priority = enemy.waypointIndex * 10000 - dist
-            if (priority > bestPriority) {
+            let score
+            if (mode === 'first') {
+              score = enemy.waypointIndex * 10000 - dist
+            } else if (mode === 'strong') {
+              score = enemy.maxHp * 10000 + enemy.hp
+            } else if (mode === 'weak') {
+              score = -enemy.hp
+            } else if (mode === 'close') {
+              score = -dist
+            }
+            if (score > bestScore) {
               bestTarget = enemy
-              bestPriority = priority
+              bestScore = score
             }
           }
         })
