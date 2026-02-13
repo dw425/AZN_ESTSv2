@@ -1471,6 +1471,16 @@ export class GameScene extends Phaser.Scene {
     if (this.waveActive || this.gameOver) return
     if (this.currentWave >= this.levelData.waves.length) return
 
+    // Award bonus gold for starting wave early (applies to both SPACE key and button click)
+    if (this.waveCountdown > 0 && this.currentWave > 0) {
+      const bonus = Math.max(0, Math.ceil(this.waveCountdown / 1000) * 5)
+      this.gold += bonus
+      if (bonus > 0) {
+        this.showFloatingText(this.cameras.main.centerX, this.cameras.main.height - 120, `+${bonus} gold!`, '#f1c40f')
+      }
+    }
+    this.waveCountdown = 0
+
     this.waveActive = true
     this.startWaveBtn.setVisible(false)
     if (this.wavePreview) this.wavePreview.setVisible(false)
@@ -2148,16 +2158,9 @@ export class GameScene extends Phaser.Scene {
         this.countdownText.setVisible(true)
         this.updateWavePreview()
 
-        // Bonus gold for starting early
+        // Re-bind button to start next wave (bonus gold is handled inside startNextWave)
         this.startWaveBtn.off('pointerdown')
-        this.startWaveBtn.on('pointerdown', () => {
-          const bonus = Math.max(0, Math.ceil(this.waveCountdown / 1000) * 5)
-          this.gold += bonus
-          if (bonus > 0) {
-            this.showFloatingText(this.cameras.main.centerX, this.cameras.main.height - 120, `+${bonus} gold!`, '#f1c40f')
-          }
-          this.startNextWave()
-        })
+        this.startWaveBtn.on('pointerdown', () => this.startNextWave())
       }
       this.updateHUD()
     }
@@ -3002,7 +3005,7 @@ export class GameScene extends Phaser.Scene {
     if (missionIdx !== undefined && BONUS_MISSIONS[missionIdx]) {
       const mission = BONUS_MISSIONS[missionIdx]
       const missionKey = `${this.levelIndex}_${this.difficulty}`
-      const wasDone = this.saveData.bonusMissions[missionKey]
+      const wasDone = save.bonusMissions[missionKey]
       const missionColor = wasDone ? '#2ecc71' : '#888'
       const missionMark = wasDone ? '\u2713' : '\u2717'
       this.add.text(cx, cy + 40, `${missionMark} Bonus: ${mission.desc}`, {
