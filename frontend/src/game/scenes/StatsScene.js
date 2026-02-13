@@ -48,7 +48,11 @@ export class StatsScene extends Phaser.Scene {
     const levelsCleared = Math.max(0, (save.levelsUnlocked || 1) - 1)
     const totalLevels = LEVELS.length
     let totalStars = 0
-    Object.values(save.levelStars).forEach(s => { totalStars += s })
+    // Only count per-level best stars (numeric keys like "0", "1") — skip per-difficulty
+    // keys like "0_normal" to avoid double-counting the same stars
+    Object.entries(save.levelStars).forEach(([key, s]) => {
+      if (/^\d+$/.test(key)) totalStars += s
+    })
     const maxStars = totalLevels * 4 * 3 // 4 difficulties, 3 stars each
     const bonusDone = Object.values(save.bonusMissions || {}).filter(Boolean).length
     const totalBonus = BONUS_MISSIONS.length

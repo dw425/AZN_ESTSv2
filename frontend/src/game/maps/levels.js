@@ -96,8 +96,8 @@ export const TOWER_TYPES = {
     slow: 0.5,
     slowDuration: 1500,
     upgrades: [
-      { cost: 90, damage: 18, range: 150, slow: 0.35, slowDuration: 2000 },
-      { cost: 180, damage: 28, range: 170, slow: 0.2, slowDuration: 2500 },
+      { cost: 90, damage: 18, range: 150, fireRate: 900, slow: 0.35, slowDuration: 2000 },
+      { cost: 180, damage: 28, range: 170, fireRate: 800, slow: 0.2, slowDuration: 2500 },
     ],
   },
 }

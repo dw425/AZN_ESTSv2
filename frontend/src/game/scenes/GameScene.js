@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { LEVELS, TOWER_TYPES, ENEMY_TYPES, BONUS_MISSIONS, DEFEAT_QUOTES, TUTORIALS } from '../maps/levels.js'
-import { loadSave, saveSave, unlockLevel, setLevelStars, completeBonusMission, setPersonalBest, markTutorialSeen, hasTutorialSeen, addTotalKills } from '../SaveManager.js'
+import { loadSave, saveSave, spendGems, unlockLevel, setLevelStars, completeBonusMission, setPersonalBest, markTutorialSeen, hasTutorialSeen, addTotalKills } from '../SaveManager.js'
 
 const TILE = 64
 
@@ -172,7 +172,8 @@ export class GameScene extends Phaser.Scene {
       }
       const cx = col * TILE + TILE / 2
       const cy = row * TILE + TILE / 2
-      const canBuild = grid[row][col] === 0 && !this.towers.find(t => t.gridCol === col && t.gridRow === row)
+      const cellVal = grid[row][col]
+      const canBuild = (cellVal === 0 || cellVal >= 6) && !this.towers.find(t => t.gridCol === col && t.gridRow === row)
       if (canBuild) {
         this.cellIndicator.setPosition(cx, cy).setVisible(true)
         this.cellNoIndicator.setVisible(false)
@@ -405,7 +406,7 @@ export class GameScene extends Phaser.Scene {
     const hasPlatform = this.textures.exists('tower_platform')
     for (let r = 0; r < grid.length; r++) {
       for (let c = 0; c < grid[r].length; c++) {
-        if (grid[r][c] === 0) {
+        if (grid[r][c] === 0 || grid[r][c] >= 6) {
           const px = c * TILE + TILE / 2
           const py = r * TILE + TILE / 2
           if (hasPlatform) {
@@ -974,19 +975,10 @@ export class GameScene extends Phaser.Scene {
         duration: 4000, repeat: -1,
       })
 
-      // Count enemies in gas radius for bonus mission
-      let gasHits = 0
-      this.enemies.forEach(enemy => {
-        if (!enemy.sprite.active) return
-        const dx = enemy.sprite.x - x
-        const dy = enemy.sprite.y - y
-        if (Math.sqrt(dx * dx + dy * dy) <= 60) gasHits++
-      })
-      if (gasHits >= 5) this.gasMultiHits++
-
       const gasObj = {
         type: 'gas', graphics: cloudContainer, x, y,
         radius: 60, dps: 30, timer: 5000, active: true,
+        hitEnemies: new Set(), // Track unique enemies hit for bonus mission
       }
       this.deployables.push(gasObj)
     }
@@ -1017,8 +1009,9 @@ export class GameScene extends Phaser.Scene {
   rechargeWeapon(weaponKey) {
     const gemCosts = { powderKeg: 3, mine: 2, gas: 2 }
     const cost = gemCosts[weaponKey]
-    if (this.gemsCollected >= cost) {
-      this.gemsCollected -= cost
+    const save = loadSave()
+    if (save.gems >= cost) {
+      spendGems(cost)
       this.weaponCharges[weaponKey]++
       this.updateWeaponButtons()
       this.updateHUD()
@@ -1079,7 +1072,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Place new tower
-    if (this.selectedTowerType && grid[row][col] === 0) {
+    if (this.selectedTowerType && (grid[row][col] === 0 || grid[row][col] >= 6)) {
       const towerDef = TOWER_TYPES[this.selectedTowerType]
       if (this.gold >= towerDef.cost) {
         if (!this.towers.find(t => t.gridCol === col && t.gridRow === row)) {
@@ -1295,13 +1288,6 @@ export class GameScene extends Phaser.Scene {
     if (type === 'cannon') this.showTutorial('Tut_PlaceCannon')
     if (type === 'scout') this.showTutorial('Tut_ScoutTower')
 
-    // Place animation — pop-in effect using scale
-    const finalScale = sprite.scaleX
-    sprite.setAlpha(0).setScale(0.15)
-    this.tweens.add({
-      targets: sprite, alpha: 1, scaleX: finalScale, scaleY: finalScale,
-      duration: 250, ease: 'Back.easeOut',
-    })
   }
 
   showTowerMenu(tower) {
@@ -1626,9 +1612,8 @@ export class GameScene extends Phaser.Scene {
     const scaledHp = Math.round(def.hp * this.diffMult.enemyHp * endlessScale)
     const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed * Math.min(endlessScale, 1.5))
 
-    // Flying enemies take a direct path (spawn → exit), bypassing the winding ground path
+    // Flying enemies follow the normal path but are immune to mines/ground effects
     const isFlying = def.flying || false
-    const flyingWaypoints = isFlying ? [this.waypoints[0], this.waypoints[this.waypoints.length - 1]] : null
 
     const scaledReward = this.endlessMode ? Math.round(def.reward * (1 + this.endlessWaveNum * 0.03)) : def.reward
 
@@ -1658,8 +1643,6 @@ export class GameScene extends Phaser.Scene {
       // Boss special ability
       bossAbility: def.bossAbility || null,
       bossAbilityTimer: 5000, // First ability fires after 5 seconds
-      // Flying enemies use their own direct waypoints
-      flyingWaypoints,
       // Boss name plate
       namePlate: null,
     }
@@ -1676,6 +1659,9 @@ export class GameScene extends Phaser.Scene {
     if (enemy.physResist > 0 || enemy.magResist > 0) {
       this.showTutorial('Tut_DamageResist')
     }
+    // Show tutorials on spawn for special enemy types
+    if (enemy.regens > 0) this.showTutorial('Tut_TrollRegen')
+    if (enemy.towerDamage > 0) this.showTutorial('Tut_GelCubes')
 
     this.enemies.push(enemy)
   }
@@ -1722,7 +1708,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Flying enemies use their own direct path (spawn → exit)
-      const wp = enemy.flyingWaypoints || this.waypoints
+      const wp = this.waypoints
       const target = wp[enemy.waypointIndex]
       if (!target) return
 
@@ -1898,7 +1884,7 @@ export class GameScene extends Phaser.Scene {
 
       // Manual target override — if player has clicked an enemy or chest, prioritize it
       let bestTarget = null
-      const canTargetFlying = tower.type === 'scout' || tower.type === 'storm'
+      const canTargetFlying = true // All towers can target flying enemies
 
       if (this.manualTarget) {
         const mt = this.manualTarget
@@ -2117,8 +2103,15 @@ export class GameScene extends Phaser.Scene {
             enemy.slowTimer = Math.max(enemy.slowTimer || 0, 500)
             enemy.speed = enemy.baseSpeed * 0.6
             if (enemy.sprite && enemy.sprite.active) enemy.sprite.setTint(0x2ecc71)
+            // Track unique enemies hit for gas_multi_5 bonus mission
+            if (dep.hitEnemies) dep.hitEnemies.add(enemy)
           }
         })
+        // Check if this gas cloud hit 5+ unique enemies
+        if (dep.hitEnemies && dep.hitEnemies.size >= 5 && !dep._bonusCounted) {
+          dep._bonusCounted = true
+          this.gasMultiHits++
+        }
         return true
       }
 
@@ -2457,10 +2450,6 @@ export class GameScene extends Phaser.Scene {
         this.showTutorial('Tut_Slimes')
       }
 
-      // Tutorial triggers for special enemy types
-      if (enemy.regens > 0) this.showTutorial('Tut_TrollRegen')
-      if (enemy.towerDamage > 0) this.showTutorial('Tut_GelCubes')
-
       this.removeEnemy(enemy)
       this.updateHUD()
     }
@@ -2586,8 +2575,9 @@ export class GameScene extends Phaser.Scene {
       sprite.setScale(babyScale)
       this.enemyGroup.add(sprite)
 
-      const scaledHp = Math.round(babyDef.hp * this.diffMult.enemyHp)
-      const scaledSpeed = Math.round(babyDef.speed * this.diffMult.enemySpeed)
+      const endlessScale = this.endlessMode ? 1 + this.endlessWaveNum * 0.08 : 1
+      const scaledHp = Math.round(babyDef.hp * this.diffMult.enemyHp * endlessScale)
+      const scaledSpeed = Math.round(babyDef.speed * this.diffMult.enemySpeed * Math.min(endlessScale, 1.5))
 
       const hpBg = this.add.graphics().setDepth(7)
       const hpBar = this.add.graphics().setDepth(8)
@@ -2604,6 +2594,8 @@ export class GameScene extends Phaser.Scene {
         barWidth: 20,
         splits: 0, regens: 0, towerDamage: 0,
         kamikaze: false, flying: false, melee: false, boss: false,
+        physResist: babyDef.physResist || 0,
+        magResist: babyDef.magResist || 0,
         size: babyDef.size || 0.6,
         namePlate: null,
       }
@@ -2634,6 +2626,8 @@ export class GameScene extends Phaser.Scene {
         nearest.hp = 0
         this.destroyTower(nearest)
       }
+      this.playSfx('sfx_explosion', 0.5)
+      this.showFloatingText(nearest.x, nearest.y - 20, '-50 HP', '#ff6600')
 
       // Explosion visual
       const boom = this.add.graphics().setDepth(11).setPosition(nearest.x, nearest.y)
@@ -2661,6 +2655,9 @@ export class GameScene extends Phaser.Scene {
       if (inRange.length > 0) {
         const target = inRange[Math.floor(Math.random() * inRange.length)]
         target.hp -= 25
+        target._damageTintTimer = 300
+        target.sprite.setTint(0xff4444)
+        this.playSfx('sfx_storm_hit', 0.4)
         // Beam visual
         const beam = this.add.graphics().setDepth(11)
         beam.lineStyle(3, 0xe74c3c, 0.8)
@@ -2687,6 +2684,7 @@ export class GameScene extends Phaser.Scene {
       })
       const hitAny = slamTargets.length > 0
       if (hitAny) {
+        this.playSfx('sfx_explosion', 0.4)
         // Slam visual — expanding ring
         const ring = this.add.graphics().setDepth(11).setPosition(ex, ey)
         ring.lineStyle(3, 0xf39c12, 0.7)
@@ -2700,7 +2698,7 @@ export class GameScene extends Phaser.Scene {
       }
     } else if (enemy.bossAbility === 'fire_breath') {
       // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
-      const wp = enemy.flyingWaypoints || this.waypoints
+      const wp = this.waypoints
       const nextWp = wp[Math.min(enemy.waypointIndex, wp.length - 1)]
       if (!nextWp) return
       const dirX = nextWp.x - ex, dirY = nextWp.y - ey
@@ -2718,6 +2716,8 @@ export class GameScene extends Phaser.Scene {
         const dot = (dx / dist) * nx + (dy / dist) * ny
         if (dot > 0.3) {
           tower.hp -= breathDamage
+          tower._damageTintTimer = 300
+          tower.sprite.setTint(0xff4444)
           if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
       })
@@ -2732,6 +2732,7 @@ export class GameScene extends Phaser.Scene {
       fb.closePath()
       fb.fillPath()
       this.tweens.add({ targets: fb, alpha: 0, duration: 500, onComplete: () => fb.destroy() })
+      this.playSfx('sfx_explosion', 0.3)
       this.showFloatingText(ex, ey - 30, 'FIRE BREATH!', '#ff4500')
     }
   }
