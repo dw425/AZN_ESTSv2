@@ -408,7 +408,7 @@ export const TUTORIALS = {
   Tut_QuickUseMines: { title: 'Land Mines', msg: 'Place mines on the path. They explode when enemies walk over them.' },
   Tut_QuickUseGas: { title: 'Poison Gas', msg: 'Deploy gas clouds to slow and damage enemies in an area.' },
   Tut_DamageResist: { title: 'Resistance!', msg: 'Some enemies resist physical or magical damage. Mix tower types to counter resistances!' },
-  Tut_TrollRegen: { title: 'Troll Shaman!', msg: 'Trolls regenerate health! Focus fire to take them down quickly.' },
+  Tut_TrollRegen: { title: 'Troll Regen!', msg: 'Trolls regenerate health! Focus fire to take them down quickly.' },
   Tut_Slimes: { title: 'Slime Alert!', msg: 'Slimes split into 3 baby slimes when killed! Be prepared.' },
   Tut_GelCubes: { title: 'Jelly Cube!', msg: 'Gel Cubes damage your towers as they slide past. Watch your tower HP!' },
   Tut_BaseDamaged: { title: 'Base Hit!', msg: 'An enemy reached your base! Build more towers to stop them.' },

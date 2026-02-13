@@ -1740,6 +1740,9 @@ export class GameScene extends Phaser.Scene {
           else enemy.sprite.clearTint()
           if (enemy.boss) enemy.sprite.setTint(0xff6666)
         }
+      } else {
+        // Reset speed to base each frame so shaman buff only applies while in range
+        enemy.speed = enemy.baseSpeed
       }
 
       // Troll regen
@@ -2690,8 +2693,10 @@ export class GameScene extends Phaser.Scene {
         barWidth: 20,
         splits: 0, regens: 0, towerDamage: 0,
         kamikaze: false, flying: false, melee: false, boss: false,
+        heals: 0, shieldAura: 0, speedBuff: 0,
         physResist: babyDef.physResist || 0,
         magResist: babyDef.magResist || 0,
+        bossAbility: null, bossAbilityTimer: 0,
         size: babyDef.size || 0.6,
         namePlate: null,
       }
@@ -3263,7 +3268,7 @@ export class GameScene extends Phaser.Scene {
       if (def.magResist > 0) info += ' \u2728' // sparkle = magic resist
       if (def.flying) info += ' \u2708' // airplane = flying
       if (def.heals) info += ' \u{1F49A}' // green heart = healer
-      if (def.shieldAura) info += ' \u{1F6E1}' // shield = aura
+      if (def.shieldAura) info += ' \u{1F6E0}' // shield = aura
       if (def.speedBuff) info += ' \u26A1' // lightning = speed buff
       if (def.boss) info += ' \u{1F451}' // crown = boss
       return info
