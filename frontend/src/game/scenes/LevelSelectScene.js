@@ -249,7 +249,7 @@ export class LevelSelectScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5))
 
-    // Difficulty options with proper spacing
+    // Difficulty options — two-line layout to avoid overlap
     const difficulties = [
       { key: 'casual', label: 'Casual', color: '#2ecc71', desc: 'More gold & lives' },
       { key: 'normal', label: 'Normal', color: '#f1c40f', desc: 'Standard challenge' },
@@ -257,15 +257,15 @@ export class LevelSelectScene extends Phaser.Scene {
       { key: 'inferno', label: 'Inferno', color: '#ff4500', desc: '2x enemy HP' },
     ]
 
-    const optionSpacing = 42
-    const firstY = -panelH / 2 + 60
+    const optionSpacing = 46
+    const firstY = -panelH / 2 + 55
 
     difficulties.forEach((diff, i) => {
       const y = firstY + i * optionSpacing
       const starKey = `${levelIndex}_${diff.key}`
       const stars = save.levelStars[starKey] || 0
 
-      // Difficulty label (left side)
+      // Difficulty label (left) — clickable
       const btn = this.add.text(-panelW / 2 + 25, y, diff.label, {
         fontSize: '16px', color: diff.color, fontStyle: 'bold',
       }).setInteractive({ useHandCursor: true })
@@ -277,23 +277,23 @@ export class LevelSelectScene extends Phaser.Scene {
       btn.on('pointerout', () => btn.setAlpha(1))
       container.add(btn)
 
-      // Stars (middle)
+      // Stars (right of label on same line)
       let starStr = ''
       for (let s = 0; s < 3; s++) starStr += s < stars ? '\u2605' : '\u2606'
-      container.add(this.add.text(40, y + 2, starStr, {
+      container.add(this.add.text(panelW / 2 - 20, y + 2, starStr, {
         fontSize: '12px', color: '#f1c40f',
-      }))
-
-      // Description (right side)
-      container.add(this.add.text(panelW / 2 - 25, y + 3, diff.desc, {
-        fontSize: '9px', color: '#777',
       }).setOrigin(1, 0))
+
+      // Description (below label, second line)
+      container.add(this.add.text(-panelW / 2 + 25, y + 20, diff.desc, {
+        fontSize: '9px', color: '#666',
+      }))
 
       // Separator line
       if (i < difficulties.length - 1) {
         const sep = this.add.graphics()
         sep.lineStyle(1, 0xffffff, 0.08)
-        sep.lineBetween(-panelW / 2 + 20, y + optionSpacing - 10, panelW / 2 - 20, y + optionSpacing - 10)
+        sep.lineBetween(-panelW / 2 + 20, y + optionSpacing - 6, panelW / 2 - 20, y + optionSpacing - 6)
         container.add(sep)
       }
     })

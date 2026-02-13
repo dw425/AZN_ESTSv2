@@ -180,8 +180,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('map_mine', 'maps/mine_grnd.jpg')
     this.load.image('map_lava', 'maps/lava_grnd.jpg')
     this.load.image('map_f1night', 'maps/f1night.jpg')
-    // towerplatform.png and pathBrush.png available on disk but not needed
-    // (map backgrounds already show paths, cell indicators show buildable spots)
+    this.load.image('tower_platform', 'maps/towerplatform.png')
+    this.load.image('path_brush', 'maps/pathBrush.png')
 
     // === Music (7 tracks) ===
     this.load.audio('music_farm', 'music/How it Begins (Farm).mp3')
@@ -314,5 +314,35 @@ export class BootScene extends Phaser.Scene {
     btn.fillRoundedRect(0, 0, 200, 50, 10)
     btn.generateTexture('button', 200, 50)
     btn.destroy()
+
+    // Cell indicator textures — always generate clean ones to avoid corruption from loaded assets
+    const cellSize = 64
+    const cellOk = this.make.graphics({ add: false })
+    cellOk.fillStyle(0x2ecc71, 0.25)
+    cellOk.fillRect(2, 2, cellSize - 4, cellSize - 4)
+    cellOk.lineStyle(2, 0x2ecc71, 0.5)
+    cellOk.strokeRect(2, 2, cellSize - 4, cellSize - 4)
+    cellOk.generateTexture('cell_ok', cellSize, cellSize)
+    cellOk.destroy()
+
+    const cellNo = this.make.graphics({ add: false })
+    cellNo.fillStyle(0xe74c3c, 0.25)
+    cellNo.fillRect(2, 2, cellSize - 4, cellSize - 4)
+    cellNo.lineStyle(2, 0xe74c3c, 0.5)
+    cellNo.strokeRect(2, 2, cellSize - 4, cellSize - 4)
+    cellNo.lineBetween(10, 10, cellSize - 10, cellSize - 10)
+    cellNo.lineBetween(cellSize - 10, 10, 10, cellSize - 10)
+    cellNo.generateTexture('cell_no', cellSize, cellSize)
+    cellNo.destroy()
+
+    // Range indicator texture
+    const rangeSize = 256
+    const rangeGfx = this.make.graphics({ add: false })
+    rangeGfx.lineStyle(2, 0x3498db, 0.4)
+    rangeGfx.fillStyle(0x3498db, 0.08)
+    rangeGfx.fillCircle(rangeSize / 2, rangeSize / 2, rangeSize / 2 - 2)
+    rangeGfx.strokeCircle(rangeSize / 2, rangeSize / 2, rangeSize / 2 - 2)
+    rangeGfx.generateTexture('range_circle', rangeSize, rangeSize)
+    rangeGfx.destroy()
   }
 }

@@ -116,40 +116,12 @@ export class GameScene extends Phaser.Scene {
     this.createBuildPanel()
     this.createWeaponBar()
 
-    // Range indicator (hidden by default) — use loaded hud_range asset or draw a circle
-    if (this.textures.exists('hud_range')) {
-      this.rangeIndicator = this.add.image(0, 0, 'hud_range').setVisible(false).setAlpha(0.3).setDepth(5)
-    } else {
-      // Fallback: draw a circle graphic for range display
-      this.rangeIndicator = this.add.graphics().setDepth(5).setVisible(false)
-      this.rangeIndicator._isFallbackGraphics = true
-    }
+    // Range indicator (uses generated texture for clean rendering)
+    this.rangeIndicator = this.add.image(0, 0, 'range_circle').setVisible(false).setAlpha(0.5).setDepth(5)
 
-    // Cell hover indicator (shows buildable/unbuildable)
-    if (this.textures.exists('hud_glow_cell')) {
-      this.cellIndicator = this.add.image(0, 0, 'hud_glow_cell').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
-    } else {
-      // Fallback: green semi-transparent square
-      const glow = this.add.graphics().setDepth(5).setVisible(false)
-      glow.fillStyle(0x2ecc71, 0.3)
-      glow.fillRect(-TILE / 2, -TILE / 2, TILE, TILE)
-      glow.lineStyle(2, 0x2ecc71, 0.6)
-      glow.strokeRect(-TILE / 2, -TILE / 2, TILE, TILE)
-      this.cellIndicator = glow
-    }
-    if (this.textures.exists('hud_no_cell')) {
-      this.cellNoIndicator = this.add.image(0, 0, 'hud_no_cell').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
-    } else {
-      // Fallback: red semi-transparent square with X
-      const noCell = this.add.graphics().setDepth(5).setVisible(false)
-      noCell.fillStyle(0xe74c3c, 0.3)
-      noCell.fillRect(-TILE / 2, -TILE / 2, TILE, TILE)
-      noCell.lineStyle(2, 0xe74c3c, 0.6)
-      noCell.strokeRect(-TILE / 2, -TILE / 2, TILE, TILE)
-      noCell.lineBetween(-TILE / 2 + 8, -TILE / 2 + 8, TILE / 2 - 8, TILE / 2 - 8)
-      noCell.lineBetween(TILE / 2 - 8, -TILE / 2 + 8, -TILE / 2 + 8, TILE / 2 - 8)
-      this.cellNoIndicator = noCell
-    }
+    // Cell hover indicators (use generated textures to avoid Graphics corruption)
+    this.cellIndicator = this.add.image(0, 0, 'cell_ok').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
+    this.cellNoIndicator = this.add.image(0, 0, 'cell_no').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
 
     // Hover handler for cell indicators
     this.input.on('pointermove', (pointer) => {
@@ -293,6 +265,35 @@ export class GameScene extends Phaser.Scene {
       const bg = this.add.graphics()
       bg.fillStyle(0x2d5a27)
       bg.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
+    }
+
+    // Render tower platforms on buildable cells (value 0)
+    const hasPlatform = this.textures.exists('tower_platform')
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        if (grid[r][c] === 0) {
+          const px = c * TILE + TILE / 2
+          const py = r * TILE + TILE / 2
+          if (hasPlatform) {
+            this.add.image(px, py, 'tower_platform')
+              .setDisplaySize(TILE - 2, TILE - 2).setDepth(1).setAlpha(0.5)
+          }
+        }
+      }
+    }
+
+    // Render path indicators on path cells (values 1, 2, 3)
+    const hasPathBrush = this.textures.exists('path_brush')
+    if (hasPathBrush) {
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const v = grid[r][c]
+          if (v >= 1 && v <= 3) {
+            this.add.image(c * TILE + TILE / 2, r * TILE + TILE / 2, 'path_brush')
+              .setDisplaySize(TILE, TILE).setDepth(1).setAlpha(0.35)
+          }
+        }
+      }
     }
 
     // Spawn/exit indicators
@@ -605,7 +606,7 @@ export class GameScene extends Phaser.Scene {
 
       const iconKey = tower.hudIcon || tower.texture
       const icon = this.add.image(x, y, iconKey)
-        .setDisplaySize(40, 40)
+        .setDisplaySize(44, 44)
         .setInteractive({ useHandCursor: true })
         .setDepth(16)
 
@@ -840,7 +841,7 @@ export class GameScene extends Phaser.Scene {
     const x = col * TILE + TILE / 2
     const y = row * TILE + TILE / 2
 
-    const sprite = this.add.sprite(x, y, def.texture).setDisplaySize(40, 40).setDepth(4)
+    const sprite = this.add.sprite(x, y, def.texture).setDisplaySize(54, 54).setDepth(4)
     this.towerGroup.add(sprite)
 
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
@@ -926,9 +927,13 @@ export class GameScene extends Phaser.Scene {
     if (type === 'cannon') this.showTutorial('Tut_PlaceCannon')
     if (type === 'scout') this.showTutorial('Tut_ScoutTower')
 
-    // Place animation
-    sprite.setScale(0)
-    this.tweens.add({ targets: sprite, scale: 1, duration: 200, ease: 'Back.easeOut' })
+    // Place animation — pop-in effect
+    sprite.setAlpha(0)
+    sprite.setDisplaySize(20, 20)
+    this.tweens.add({
+      targets: sprite, alpha: 1, displayWidth: 54, displayHeight: 54,
+      duration: 250, ease: 'Back.easeOut',
+    })
   }
 
   showTowerMenu(tower) {
@@ -940,17 +945,9 @@ export class GameScene extends Phaser.Scene {
     const needsRepair = tower.hp < tower.maxHp
     const repairCost = needsRepair ? Math.floor((tower.maxHp - tower.hp) * 0.3) : 0
 
-    // Show range
-    if (this.rangeIndicator._isFallbackGraphics) {
-      this.rangeIndicator.clear()
-      this.rangeIndicator.lineStyle(2, 0x3498db, 0.4)
-      this.rangeIndicator.fillStyle(0x3498db, 0.1)
-      this.rangeIndicator.fillCircle(tower.x, tower.y, tower.range)
-      this.rangeIndicator.strokeCircle(tower.x, tower.y, tower.range)
-    } else {
-      this.rangeIndicator.setPosition(tower.x, tower.y)
-      this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
-    }
+    // Show range indicator circle
+    this.rangeIndicator.setPosition(tower.x, tower.y)
+    this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
     this.rangeIndicator.setVisible(true)
 
     const menuH = 45 + (upgrade ? 25 : 0) + (needsRepair ? 20 : 0)
@@ -1121,7 +1118,7 @@ export class GameScene extends Phaser.Scene {
 
   spawnEnemy(def, type) {
     const start = this.waypoints[0]
-    const spriteSize = def.boss ? 44 : def.size ? Math.round(28 * def.size) : 28
+    const spriteSize = def.boss ? 56 : def.size ? Math.round(40 * def.size) : 40
 
     // Use animated sprite if walk animation exists for this enemy type
     const baseType = type.replace('boss_', '')
@@ -1723,7 +1720,7 @@ export class GameScene extends Phaser.Scene {
       const offsetX = Phaser.Math.Between(-15, 15)
       const offsetY = Phaser.Math.Between(-15, 15)
 
-      const spriteSize = Math.round(28 * (babyDef.size || 0.6))
+      const spriteSize = Math.round(40 * (babyDef.size || 0.6))
       const sprite = this.add.image(enemy.sprite.x + offsetX, enemy.sprite.y + offsetY, babyDef.texture)
         .setDisplaySize(spriteSize, spriteSize)
         .setDepth(6)
