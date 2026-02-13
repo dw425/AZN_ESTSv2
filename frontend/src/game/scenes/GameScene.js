@@ -2801,7 +2801,7 @@ export class GameScene extends Phaser.Scene {
       }
     } else if (enemy.bossAbility === 'fire_breath') {
       // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
-      const wp = this.waypoints
+      const wp = enemy.flying ? this.flyWaypoints : this.waypoints
       const nextWp = wp[Math.min(enemy.waypointIndex, wp.length - 1)]
       if (!nextWp) return
       const dirX = nextWp.x - ex, dirY = nextWp.y - ey
