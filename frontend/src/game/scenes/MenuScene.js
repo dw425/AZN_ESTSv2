@@ -48,8 +48,12 @@ export class MenuScene extends Phaser.Scene {
     playBtn.on('pointerover', () => playBtn.setTint(0xddaa66))
     playBtn.on('pointerout', () => playBtn.clearTint())
     playBtn.on('pointerdown', () => {
+      this.stopMenuMusic()
       this.scene.start('LevelSelectScene')
     })
+
+    // Start menu music
+    this.startMenuMusic()
 
     // Credits
     this.add.text(cx, cy + 140, 'Inspired by Towers N\' Trolls by Ember Entertainment', {
@@ -59,11 +63,26 @@ export class MenuScene extends Phaser.Scene {
       strokeThickness: 2,
     }).setOrigin(0.5)
 
-    this.add.text(cx, h - 20, 'v1.0.0 | Web Edition', {
+    this.add.text(cx, h - 20, 'v2.0.0 | Web Edition', {
       fontSize: '11px',
       color: '#666',
       stroke: '#000',
       strokeThickness: 1,
     }).setOrigin(0.5)
+  }
+
+  startMenuMusic() {
+    try {
+      if (this.cache.audio.exists('music_menu')) {
+        this.menuMusic = this.sound.add('music_menu', { loop: true, volume: 0.3 })
+        this.menuMusic.play()
+      }
+    } catch (e) { /* audio not available */ }
+  }
+
+  stopMenuMusic() {
+    if (this.menuMusic && this.menuMusic.isPlaying) {
+      this.menuMusic.stop()
+    }
   }
 }

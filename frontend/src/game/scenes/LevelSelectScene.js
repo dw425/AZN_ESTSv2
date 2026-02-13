@@ -189,9 +189,9 @@ export class LevelSelectScene extends Phaser.Scene {
     // Panel
     const panel = this.add.graphics()
     panel.fillStyle(0x16213e, 0.95)
-    panel.fillRoundedRect(-140, -90, 280, 180, 10)
+    panel.fillRoundedRect(-140, -100, 280, 210, 10)
     panel.lineStyle(2, 0xe94560)
-    panel.strokeRoundedRect(-140, -90, 280, 180, 10)
+    panel.strokeRoundedRect(-140, -100, 280, 210, 10)
     container.add(panel)
 
     const levelName = LEVELS[levelIndex]?.name || `Level ${levelIndex + 1}`
@@ -204,10 +204,11 @@ export class LevelSelectScene extends Phaser.Scene {
       { key: 'casual', label: 'Casual', color: '#2ecc71', desc: 'More gold, more lives' },
       { key: 'normal', label: 'Normal', color: '#f1c40f', desc: 'Standard challenge' },
       { key: 'brutal', label: 'Brutal', color: '#e74c3c', desc: 'Less gold, tougher enemies' },
+      { key: 'inferno', label: 'Inferno', color: '#ff4500', desc: 'Minimal gold, 2x enemy HP' },
     ]
 
     difficulties.forEach((diff, i) => {
-      const y = -25 + i * 35
+      const y = -30 + i * 30
       const starKey = `${levelIndex}_${diff.key}`
       const stars = save.levelStars[starKey] || 0
       let starStr = ''

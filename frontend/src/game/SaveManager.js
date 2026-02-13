@@ -5,6 +5,11 @@ const DEFAULT_SAVE = {
   gems: 100,
   levelsUnlocked: 1,
   levelStars: {},        // e.g. { "0": 3, "1": 2 }
+  bonusMissions: {},     // e.g. { "0": true, "1_brutal": true }
+  personalBests: {},     // e.g. { "0_normal": { score: 1500, kills: 45 } }
+  tutorialsSeen: {},     // e.g. { "Tut_PlaceBallista": true }
+  totalKills: 0,
+  totalGemsEarned: 0,
   upgrades: {
     goldStartBoost: 0,
     goldWaveBoost: 0,
@@ -201,4 +206,39 @@ export function setLevelStars(levelIndex, stars) {
   save.levelStars[String(levelIndex)] = Math.max(existing, stars)
   saveSave(save)
   return save
+}
+
+export function completeBonusMission(key) {
+  const save = loadSave()
+  save.bonusMissions[key] = true
+  saveSave(save)
+  return save
+}
+
+export function setPersonalBest(key, score, kills) {
+  const save = loadSave()
+  const existing = save.personalBests[key]
+  if (!existing || score > existing.score) {
+    save.personalBests[key] = { score, kills }
+    saveSave(save)
+  }
+  return save
+}
+
+export function markTutorialSeen(tutId) {
+  const save = loadSave()
+  save.tutorialsSeen[tutId] = true
+  saveSave(save)
+}
+
+export function hasTutorialSeen(tutId) {
+  const save = loadSave()
+  return save.tutorialsSeen[tutId] || false
+}
+
+export function addTotalKills(count) {
+  const save = loadSave()
+  save.totalKills = (save.totalKills || 0) + count
+  save.totalGemsEarned = (save.totalGemsEarned || 0)
+  saveSave(save)
 }

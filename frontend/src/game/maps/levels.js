@@ -240,8 +240,78 @@ export const ENEMY_TYPES = {
 }
 
 // Level definitions
+// Bonus mission definitions per level
+// These are checked in GameScene and shown as objectives
+export const BONUS_MISSIONS = [
+  { desc: 'Pinch to zoom in and out', check: 'always' },
+  { desc: 'Kill 3 enemies at once with Powder Keg', check: 'keg_multi_3' },
+  { desc: 'Collect 3 gems', check: 'gems_3' },
+  { desc: 'Upgrade a Catapult to Level 3', check: 'upgrade_catapult_3' },
+  { desc: 'Repair 3 damaged towers', check: 'repair_3' },
+  { desc: 'Sell 5 towers', check: 'sell_5' },
+  { desc: 'Reach 500 gold', check: 'gold_500' },
+  { desc: 'Gas 5 enemies at once', check: 'gas_multi_5' },
+  { desc: 'Kill Ogre with Scout Tower', check: 'scout_kill_ogre' },
+  { desc: 'Reach 25 gems', check: 'gems_25' },
+  { desc: 'Build 3 Storm Towers', check: 'build_storm_3' },
+  { desc: 'Reach 400 gold', check: 'gold_400' },
+  { desc: 'Consume all gold deposits', check: 'all_gold_deposits' },
+  { desc: 'Reach 20 gems', check: 'gems_20' },
+  { desc: 'Defeat the boss', check: 'kill_boss' },
+  { desc: 'Complete without special weapons', check: 'no_weapons' },
+  { desc: 'Complete without Ice Towers', check: 'no_ice' },
+  { desc: 'Kill 20 with Scout Tower', check: 'scout_kills_20' },
+  { desc: 'Build 15 towers', check: 'build_15' },
+  { desc: 'Reach 35 gems', check: 'gems_35' },
+]
+
+// Defeat quotes shown on game over screen (from original game)
+export const DEFEAT_QUOTES = [
+  '"Victory belongs to the most persevering." - Napoleon Bonaparte',
+  '"The more you sweat in training, the less you bleed in combat." - Richard Marcinko',
+  'Pro Tip: Gas Cloud + Powder Keg combo is devastatingly effective!',
+  'Pro Tip: Don\'t hoard gold. Spend it on towers and upgrades!',
+  '"Old Troll Proverb: Revenge is a dish best served cold."',
+  'Pro Tip: Try Casual Mode to learn the maps first.',
+  '"Fall seven times, stand up eight." - Japanese Proverb',
+  'Pro Tip: Ice towers are essential for slowing bosses.',
+  '"In the middle of difficulty lies opportunity." - Albert Einstein',
+  'Pro Tip: Scout towers do more damage with each consecutive hit!',
+  '"Courage is not the absence of fear, but the triumph over it." - Nelson Mandela',
+  'Pro Tip: Catapults are great against swarms. Place them where paths bunch up.',
+  '"A smooth sea never made a skilled sailor." - Franklin D. Roosevelt',
+  'Pro Tip: Storm towers chain lightning through groups. Position them wisely!',
+  '"Strength does not come from winning." - Vince Lombardi',
+  'Pro Tip: Sell underperforming towers to fund better ones.',
+  '"The only way to do great work is to love what you do." - Steve Jobs',
+]
+
+// Tutorial messages triggered contextually
+export const TUTORIALS = {
+  Tut_PlaceBallista: { title: 'Build a Tower', msg: 'Select a tower from the panel below, then tap an empty grass tile to build it.' },
+  Tut_UpgradeTower: { title: 'Upgrade', msg: 'Tap a tower to see its menu. Upgrade to increase damage, range and fire rate!' },
+  Tut_PlaceIceTower: { title: 'Ice Tower', msg: 'Ice towers slow enemies, giving other towers more time to attack.' },
+  Tut_PlaceCatapult: { title: 'Catapult', msg: 'Catapults deal splash damage, great against groups of enemies!' },
+  Tut_PlaceStormTower: { title: 'Storm Tower', msg: 'Lightning chains through multiple enemies in a line!' },
+  Tut_PlaceCannon: { title: 'Cannon', msg: 'Cannons fire explosive shells with moderate splash damage.' },
+  Tut_Repair: { title: 'Tower Damaged!', msg: 'Enemies can damage your towers. Tap a damaged tower and use Repair to fix it.' },
+  Tut_QuickUsePowderKeg: { title: 'Powder Keg', msg: 'Select the keg icon and tap the map to deploy an explosive barrel!' },
+  Tut_QuickUseMines: { title: 'Land Mines', msg: 'Place mines on the path. They explode when enemies walk over them.' },
+  Tut_QuickUseGas: { title: 'Poison Gas', msg: 'Deploy gas clouds to slow and damage enemies in an area.' },
+  Tut_TrollRegen: { title: 'Troll Shaman!', msg: 'Trolls regenerate health! Focus fire to take them down quickly.' },
+  Tut_Slimes: { title: 'Slime Alert!', msg: 'Slimes split into 3 baby slimes when killed! Be prepared.' },
+  Tut_GelCubes: { title: 'Jelly Cube!', msg: 'Gel Cubes damage your towers as they slide past. Watch your tower HP!' },
+  Tut_BaseDamaged: { title: 'Base Hit!', msg: 'An enemy reached your base! Build more towers to stop them.' },
+  Tut_ScoutTower: { title: 'Scout Tower', msg: 'Each consecutive shot on the same target does +25% more damage!' },
+  Tut_MineGoldDeposit: { title: 'Gold Deposit!', msg: 'Build a tower next to the gold deposit to mine it for bonus gold.' },
+  Tut_Chests: { title: 'Treasure!', msg: 'Build a tower next to a chest to open it and claim bonus gold.' },
+  Tut_Runes: { title: 'Magic Rune!', msg: 'Runes boost nearby towers. Build towers within range of runes for bonus effects!' },
+}
+
 // grid: 15 columns x 10 rows (960/64=15, 640/64=10)
 // 0 = grass (buildable), 1 = path, 2 = spawn, 3 = exit
+// 4 = gold deposit, 5 = treasure chest
+// 6 = damage rune, 7 = speed rune, 8 = range rune
 export const LEVELS = [
   {
     name: 'Green Hills',
@@ -250,6 +320,7 @@ export const LEVELS = [
     music: 'music_farm',
     startGold: 200,
     lives: 20,
+    bonusMission: 0,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
@@ -258,7 +329,7 @@ export const LEVELS = [
       [0,0,0,1,1,1,1,1,0,0,0,1,0,0,0],
       [0,0,0,0,0,0,0,1,0,0,0,1,0,0,0],
       [0,0,0,0,0,0,0,1,1,1,1,1,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,4,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
     ],
@@ -275,6 +346,7 @@ export const LEVELS = [
     world: 2,
     mapBg: 'map_f1',
     music: 'music_farm',
+    bonusMission: 1,
     startGold: 250,
     lives: 18,
     grid: [
@@ -303,6 +375,7 @@ export const LEVELS = [
     world: 3,
     mapBg: 'map_f3',
     music: 'music_glacier',
+    bonusMission: 2,
     startGold: 300,
     lives: 15,
     grid: [
@@ -310,9 +383,9 @@ export const LEVELS = [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
       [0,1,1,1,1,1,1,1,1,1,1,1,0,1,0],
       [0,1,0,0,0,0,0,0,0,0,0,1,0,1,0],
+      [0,1,0,0,0,0,6,0,0,0,0,1,0,1,0],
       [0,1,0,0,0,0,0,0,0,0,0,1,0,1,0],
-      [0,1,0,0,0,0,0,0,0,0,0,1,0,1,0],
-      [0,1,0,0,0,0,0,0,0,0,0,1,0,1,0],
+      [0,1,0,0,0,0,0,0,8,0,0,1,0,1,0],
       [0,1,1,1,1,1,1,1,1,1,1,1,0,1,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
@@ -331,6 +404,7 @@ export const LEVELS = [
     world: 4,
     mapBg: 'map_desert',
     music: 'music_desert',
+    bonusMission: 3,
     startGold: 280,
     lives: 15,
     grid: [
@@ -358,13 +432,14 @@ export const LEVELS = [
     world: 5,
     mapBg: 'map_ice',
     music: 'music_glacier',
+    bonusMission: 4,
     startGold: 350,
     lives: 12,
     grid: [
       [0,0,0,0,0,0,2,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+      [0,0,0,7,0,0,0,0,0,1,0,0,0,0,0],
       [0,1,1,1,1,1,1,1,0,1,0,0,0,0,0],
       [0,1,0,0,0,0,0,1,0,1,0,0,0,0,0],
       [0,1,0,0,0,0,0,1,1,1,0,0,0,0,0],
@@ -390,6 +465,7 @@ export const LEVELS = [
     music: 'music_farm',
     startGold: 180,
     lives: 20,
+    bonusMission: 5,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -416,6 +492,7 @@ export const LEVELS = [
     music: 'music_farm',
     startGold: 220,
     lives: 18,
+    bonusMission: 6,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -444,13 +521,14 @@ export const LEVELS = [
     music: 'music_farm',
     startGold: 260,
     lives: 18,
+    bonusMission: 7,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,1,1,1,1,1,1,1,0,0,0],
       [0,0,0,0,0,1,0,0,0,0,0,1,0,0,0],
       [2,1,1,1,1,1,0,0,0,0,0,1,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],
+      [0,0,5,0,0,0,0,0,0,0,0,1,0,0,0],
+      [0,0,0,0,0,0,0,4,0,0,0,1,0,0,0],
       [0,0,0,0,0,1,1,1,1,1,1,1,0,0,0],
       [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,1,1,1,1,1,1,1,1,1,3],
@@ -473,6 +551,7 @@ export const LEVELS = [
     music: 'music_glacier',
     startGold: 280,
     lives: 15,
+    bonusMission: 8,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -501,13 +580,14 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 300,
     lives: 15,
+    bonusMission: 9,
     grid: [
       [2,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],
+      [0,0,0,0,0,7,0,0,0,0,0,1,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,1,1,1,3],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -529,6 +609,7 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 320,
     lives: 12,
+    bonusMission: 10,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,1,1,1,1,1,1,1,1,1,0,0,0],
@@ -557,6 +638,7 @@ export const LEVELS = [
     music: 'music_desert',
     startGold: 300,
     lives: 15,
+    bonusMission: 11,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
@@ -586,12 +668,13 @@ export const LEVELS = [
     music: 'music_glacier',
     startGold: 350,
     lives: 12,
+    bonusMission: 12,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
       [0,0,1,0,0,0,0,0,0,0,0,0,1,0,0],
       [2,1,1,0,0,0,0,0,0,0,0,0,1,1,3],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,4,0,0,0,6,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -614,6 +697,7 @@ export const LEVELS = [
     music: 'music_desert',
     startGold: 280,
     lives: 15,
+    bonusMission: 13,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -641,6 +725,7 @@ export const LEVELS = [
     music: 'music_desert',
     startGold: 320,
     lives: 12,
+    bonusMission: 14,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -669,6 +754,7 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 300,
     lives: 12,
+    bonusMission: 15,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -696,6 +782,7 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 350,
     lives: 10,
+    bonusMission: 16,
     grid: [
       [2,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
@@ -725,13 +812,14 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 350,
     lives: 10,
+    bonusMission: 17,
     grid: [
       [0,0,0,0,0,0,0,2,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+      [0,0,0,8,0,0,0,1,1,1,1,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
       [0,0,0,0,1,1,1,1,1,1,1,0,0,0,0],
-      [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,1,0,0,0,0,5,0,0,0,0,0],
       [0,0,0,0,1,1,1,1,1,1,1,1,1,1,3],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -753,6 +841,7 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 400,
     lives: 8,
+    bonusMission: 18,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -781,6 +870,7 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 400,
     lives: 10,
+    bonusMission: 19,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
@@ -790,7 +880,7 @@ export const LEVELS = [
       [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,1,1,1,1,3],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,7,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
     ],
     waves: [
@@ -809,13 +899,14 @@ export const LEVELS = [
     music: 'music_gauntlet',
     startGold: 450,
     lives: 8,
+    bonusMission: 14,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
       [0,1,0,0,0,0,0,0,0,0,0,0,1,0,0],
       [0,1,0,1,1,1,1,1,1,1,1,0,1,0,0],
-      [2,1,0,1,0,0,0,0,0,0,1,0,1,0,0],
-      [0,0,0,1,0,0,0,0,0,0,1,0,1,0,0],
+      [2,1,0,1,0,0,6,0,0,0,1,0,1,0,0],
+      [0,0,0,1,0,0,7,0,5,0,1,0,1,0,0],
       [0,0,0,1,1,1,1,1,1,1,1,0,1,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,1,1,3],
