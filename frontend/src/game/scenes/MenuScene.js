@@ -55,8 +55,20 @@ export class MenuScene extends Phaser.Scene {
     // Start menu music
     this.startMenuMusic()
 
+    // Stats button
+    const statsBtn = this.add.text(cx, cy + 110, 'STATS', {
+      fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold',
+      color: '#f1c40f', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+    statsBtn.on('pointerover', () => statsBtn.setColor('#fff'))
+    statsBtn.on('pointerout', () => statsBtn.setColor('#f1c40f'))
+    statsBtn.on('pointerdown', () => {
+      this.stopMenuMusic()
+      this.scene.start('StatsScene')
+    })
+
     // Credits
-    this.add.text(cx, cy + 140, 'Inspired by Towers N\' Trolls by Ember Entertainment', {
+    this.add.text(cx, cy + 150, 'Inspired by Towers N\' Trolls by Ember Entertainment', {
       fontSize: '12px',
       color: '#aaa',
       stroke: '#000',

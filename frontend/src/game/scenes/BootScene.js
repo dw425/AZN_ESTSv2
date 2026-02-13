@@ -89,17 +89,42 @@ export class BootScene extends Phaser.Scene {
     this.load.image('tower_winter_2', 'towers/winter/winter_l2-0.png')
     this.load.image('tower_winter_3', 'towers/winter/winter_l3-0.png')
 
-    // === Creep sprites ===
+    // === Creep sprites (static + animation frames) ===
     this.load.image('creep_troll', 'creeps/troll/troll-0.png')
+    this.load.image('creep_troll_1', 'creeps/troll/troll-1.png')
+    this.load.image('creep_troll_2', 'creeps/troll/troll-2.png')
     this.load.image('creep_goblin', 'creeps/goblin/goblin-0.png')
+    this.load.image('creep_goblin_1', 'creeps/goblin/goblin-1.png')
+    this.load.image('creep_goblin_2', 'creeps/goblin/goblin-2.png')
     this.load.image('creep_ogre', 'creeps/ogre/ogre-0.png')
+    this.load.image('creep_ogre_1', 'creeps/ogre/ogre-1.png')
+    this.load.image('creep_ogre_2', 'creeps/ogre/ogre-2.png')
     this.load.image('creep_orc', 'creeps/orc/orc-0.png')
+    this.load.image('creep_orc_1', 'creeps/orc/orc-1.png')
+    this.load.image('creep_orc_2', 'creeps/orc/orc-2.png')
+    this.load.image('creep_orc_3', 'creeps/orc/orc-3.png')
     this.load.image('creep_slime', 'creeps/slime/slime-0.png')
+    this.load.image('creep_slime_1', 'creeps/slime/slime-1.png')
     this.load.image('creep_gelcube', 'creeps/gelcube/gelcube-0.png')
+    this.load.image('creep_gelcube_1', 'creeps/gelcube/gelcube-1.png')
     this.load.image('creep_beholder', 'creeps/beholder/beholder-0.png')
+    this.load.image('creep_beholder_1', 'creeps/beholder/beholder-1.png')
     this.load.image('creep_dragon', 'creeps/dragon/dragon-0.png')
+    this.load.image('creep_dragon_1', 'creeps/dragon/dragon-1.png')
+    this.load.image('creep_dragon_2', 'creeps/dragon/dragon-2.png')
     this.load.image('creep_giant', 'creeps/giant/giant-0.png')
     this.load.image('creep_rocketgoblin', 'creeps/rocketgoblin/rocketgoblin-0.png')
+
+    // === Underground map textures ===
+    this.load.image('map_desert_under', 'maps/desert_ugrnd.jpg')
+    this.load.image('map_f1b_under', 'maps/f1b_ugrnd.jpg')
+    this.load.image('map_f3_under', 'maps/f3_ugrnd.jpg')
+    this.load.image('map_f3night_under', 'maps/f3night_ugrnd.jpg')
+    this.load.image('map_ice_under', 'maps/ice_ugrnd.jpg')
+    this.load.image('map_lava_under', 'maps/lava_ugrnd.jpg')
+    this.load.image('map_mine_under', 'maps/mine_ugrnd.jpg')
+    this.load.image('map_sand_under', 'maps/sand_ugrnd.jpg')
+    this.load.image('map_underworld_under', 'maps/undrwrld_ugrnd.jpg')
 
     // === Projectiles ===
     this.load.image('proj_ballista', 'projectiles/ballista1_projectile-0.png')
@@ -178,7 +203,34 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     this.generateFallbacks()
+    this.createAnimations()
     this.scene.start('MenuScene')
+  }
+
+  createAnimations() {
+    // Creep walk animations using individual loaded images
+    const animDefs = [
+      { key: 'troll_walk', prefix: 'creep_troll', frames: ['creep_troll', 'creep_troll_1', 'creep_troll_2'], rate: 6 },
+      { key: 'goblin_walk', prefix: 'creep_goblin', frames: ['creep_goblin', 'creep_goblin_1', 'creep_goblin_2'], rate: 8 },
+      { key: 'ogre_walk', prefix: 'creep_ogre', frames: ['creep_ogre', 'creep_ogre_1', 'creep_ogre_2'], rate: 5 },
+      { key: 'orc_walk', prefix: 'creep_orc', frames: ['creep_orc', 'creep_orc_1', 'creep_orc_2', 'creep_orc_3'], rate: 7 },
+      { key: 'slime_walk', prefix: 'creep_slime', frames: ['creep_slime', 'creep_slime_1'], rate: 4 },
+      { key: 'gelcube_walk', prefix: 'creep_gelcube', frames: ['creep_gelcube', 'creep_gelcube_1'], rate: 3 },
+      { key: 'beholder_walk', prefix: 'creep_beholder', frames: ['creep_beholder', 'creep_beholder_1'], rate: 4 },
+      { key: 'dragon_walk', prefix: 'creep_dragon', frames: ['creep_dragon', 'creep_dragon_1', 'creep_dragon_2'], rate: 5 },
+    ]
+
+    animDefs.forEach(def => {
+      const validFrames = def.frames.filter(f => this.textures.exists(f))
+      if (validFrames.length > 1) {
+        this.anims.create({
+          key: def.key,
+          frames: validFrames.map(f => ({ key: f })),
+          frameRate: def.rate,
+          repeat: -1,
+        })
+      }
+    })
   }
 
   generateFallbacks() {

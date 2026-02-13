@@ -233,16 +233,33 @@ export class GameScene extends Phaser.Scene {
         const y = r * TILE + TILE / 2
 
         if (val === 2) {
+          // Spawn portal visual — glowing ring
+          const portal = this.add.graphics().setDepth(2)
+          portal.lineStyle(3, 0x2ecc71, 0.7)
+          portal.strokeCircle(x, y, 20)
+          portal.fillStyle(0x2ecc71, 0.15)
+          portal.fillCircle(x, y, 20)
           this.add.text(x, y, '\u25B6', {
-            fontSize: '16px', color: '#2ecc71',
-            stroke: '#000', strokeThickness: 3,
-          }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
+            fontSize: '14px', color: '#2ecc71',
+            stroke: '#000', strokeThickness: 2,
+          }).setOrigin(0.5).setDepth(3).setAlpha(0.9)
+          // Pulse animation
+          this.tweens.add({ targets: portal, alpha: { from: 0.8, to: 0.3 }, duration: 1200, yoyo: true, repeat: -1 })
         }
         if (val === 3) {
-          this.add.text(x, y, '\u2691', {
-            fontSize: '20px', color: '#e74c3c',
-            stroke: '#000', strokeThickness: 3,
-          }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
+          // Base castle visual — small fortress icon
+          const castle = this.add.graphics().setDepth(2)
+          castle.fillStyle(0x8b4513, 0.8)
+          castle.fillRect(x - 14, y - 12, 28, 24)
+          castle.fillStyle(0xa0522d, 0.9)
+          castle.fillRect(x - 16, y - 18, 10, 16)
+          castle.fillRect(x + 6, y - 18, 10, 16)
+          castle.fillStyle(0x654321, 0.9)
+          castle.fillRect(x - 4, y - 2, 8, 14)
+          this.add.text(x, y + 18, '\u2691', {
+            fontSize: '12px', color: '#e74c3c',
+            stroke: '#000', strokeThickness: 2,
+          }).setOrigin(0.5).setDepth(3).setAlpha(0.8)
         }
       }
     }
@@ -988,10 +1005,20 @@ export class GameScene extends Phaser.Scene {
     const start = this.waypoints[0]
     const spriteSize = def.boss ? 44 : def.size ? Math.round(28 * def.size) : 28
 
-    const sprite = this.add.image(start.x, start.y, def.texture)
-      .setDisplaySize(spriteSize, spriteSize)
-      .setDepth(6)
+    // Use animated sprite if walk animation exists for this enemy type
+    const baseType = type.replace('boss_', '')
+    const animKey = `${baseType}_walk`
+    const hasAnim = this.anims.exists(animKey)
+
+    const sprite = hasAnim
+      ? this.add.sprite(start.x, start.y, def.texture).setDisplaySize(spriteSize, spriteSize).setDepth(6)
+      : this.add.image(start.x, start.y, def.texture).setDisplaySize(spriteSize, spriteSize).setDepth(6)
     this.enemyGroup.add(sprite)
+
+    // Play walk animation if available
+    if (hasAnim && sprite.play) {
+      try { sprite.play(animKey) } catch (e) {}
+    }
 
     // Boss tint (reddish glow)
     if (def.boss) {
@@ -1611,16 +1638,25 @@ export class GameScene extends Phaser.Scene {
 
     const baseGem = reward >= 30 ? 3 : reward >= 15 ? 2 : 1
     const gemValue = Math.max(1, Math.round(baseGem * this.diffMult.gemMult))
-    const colors = [0x9b59b6, 0x3498db, 0x2ecc71, 0xe74c3c, 0xf1c40f]
-    const color = colors[Math.floor(Math.random() * colors.length)]
 
-    const gem = this.add.graphics().setDepth(12)
-    gem.fillStyle(color, 0.9)
-    gem.fillPoints([
-      { x: 0, y: -6 }, { x: 5, y: 0 },
-      { x: 0, y: 6 }, { x: -5, y: 0 },
-    ], true)
-    gem.setPosition(x, y)
+    // Use gem sprites if available — larger gem for higher value
+    let gem
+    const isLarge = gemValue >= 3
+    const gemKey = isLarge ? 'hud_gem' : 'hud_gem_small'
+    if (this.textures.exists(gemKey)) {
+      const sz = isLarge ? 20 : 14
+      gem = this.add.image(x, y, gemKey).setDisplaySize(sz, sz).setDepth(12)
+    } else {
+      const colors = [0x9b59b6, 0x3498db, 0x2ecc71, 0xe74c3c, 0xf1c40f]
+      const color = colors[Math.floor(Math.random() * colors.length)]
+      gem = this.add.graphics().setDepth(12)
+      gem.fillStyle(color, 0.9)
+      gem.fillPoints([
+        { x: 0, y: -6 }, { x: 5, y: 0 },
+        { x: 0, y: 6 }, { x: -5, y: 0 },
+      ], true)
+      gem.setPosition(x, y)
+    }
 
     this.tweens.add({
       targets: gem,

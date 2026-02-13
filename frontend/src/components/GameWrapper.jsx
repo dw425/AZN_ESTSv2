@@ -5,6 +5,7 @@ import { MenuScene } from '../game/scenes/MenuScene.js'
 import { GameScene } from '../game/scenes/GameScene.js'
 import { LevelSelectScene } from '../game/scenes/LevelSelectScene.js'
 import { ShopScene } from '../game/scenes/ShopScene.js'
+import { StatsScene } from '../game/scenes/StatsScene.js'
 import SaveManager from './SaveManager.jsx'
 
 export default function GameWrapper({ user, onLogout, apiBase }) {
@@ -25,7 +26,7 @@ export default function GameWrapper({ user, onLogout, apiBase }) {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
-      scene: [BootScene, MenuScene, LevelSelectScene, ShopScene, GameScene],
+      scene: [BootScene, MenuScene, LevelSelectScene, ShopScene, StatsScene, GameScene],
       physics: {
         default: 'arcade',
         arcade: { debug: false },
