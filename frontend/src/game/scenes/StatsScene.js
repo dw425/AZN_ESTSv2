@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { loadSave } from '../SaveManager.js'
+import { loadSave, UPGRADE_DEFS } from '../SaveManager.js'
 import { LEVELS, BONUS_MISSIONS } from '../maps/levels.js'
 
 export class StatsScene extends Phaser.Scene {
@@ -61,7 +61,7 @@ export class StatsScene extends Phaser.Scene {
     let upgradeMax = 0
     Object.entries(save.upgrades || {}).forEach(([key, val]) => {
       upgradeCount += val
-      upgradeMax += 5 // assuming max 5 per upgrade
+      upgradeMax += (UPGRADE_DEFS[key] ? UPGRADE_DEFS[key].maxLevel : 5)
     })
 
     const stats = [

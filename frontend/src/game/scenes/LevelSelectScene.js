@@ -223,10 +223,12 @@ export class LevelSelectScene extends Phaser.Scene {
 
     const container = this.add.container(cx, cy).setDepth(50)
 
-    // Backdrop
+    // Backdrop — interactive so clicking outside panel closes popup
     const backdrop = this.add.graphics()
     backdrop.fillStyle(0x000000, 0.7)
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
+    backdrop.setInteractive(new Phaser.Geom.Rectangle(-cx, -cy, cx * 2, cy * 2), Phaser.Geom.Rectangle.Contains)
+    backdrop.on('pointerdown', () => container.destroy())
     container.add(backdrop)
 
     // Panel — taller to fit all content

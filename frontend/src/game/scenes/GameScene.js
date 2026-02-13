@@ -116,19 +116,40 @@ export class GameScene extends Phaser.Scene {
     this.createBuildPanel()
     this.createWeaponBar()
 
-    // Range indicator (hidden by default) — use loaded hud_range asset
-    const rangeKey = this.textures.exists('hud_range') ? 'hud_range' : 'range_indicator'
-    this.rangeIndicator = this.add.image(0, 0, rangeKey).setVisible(false).setAlpha(0.3).setDepth(5)
+    // Range indicator (hidden by default) — use loaded hud_range asset or draw a circle
+    if (this.textures.exists('hud_range')) {
+      this.rangeIndicator = this.add.image(0, 0, 'hud_range').setVisible(false).setAlpha(0.3).setDepth(5)
+    } else {
+      // Fallback: draw a circle graphic for range display
+      this.rangeIndicator = this.add.graphics().setDepth(5).setVisible(false)
+      this.rangeIndicator._isFallbackGraphics = true
+    }
 
     // Cell hover indicator (shows buildable/unbuildable)
-    const glowKey = this.textures.exists('hud_glow_cell') ? 'hud_glow_cell' : null
-    const noKey = this.textures.exists('hud_no_cell') ? 'hud_no_cell' : null
-    this.cellIndicator = glowKey
-      ? this.add.image(0, 0, glowKey).setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
-      : this.add.graphics().setDepth(5).setVisible(false)
-    this.cellNoIndicator = noKey
-      ? this.add.image(0, 0, noKey).setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
-      : this.add.graphics().setDepth(5).setVisible(false)
+    if (this.textures.exists('hud_glow_cell')) {
+      this.cellIndicator = this.add.image(0, 0, 'hud_glow_cell').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
+    } else {
+      // Fallback: green semi-transparent square
+      const glow = this.add.graphics().setDepth(5).setVisible(false)
+      glow.fillStyle(0x2ecc71, 0.3)
+      glow.fillRect(-TILE / 2, -TILE / 2, TILE, TILE)
+      glow.lineStyle(2, 0x2ecc71, 0.6)
+      glow.strokeRect(-TILE / 2, -TILE / 2, TILE, TILE)
+      this.cellIndicator = glow
+    }
+    if (this.textures.exists('hud_no_cell')) {
+      this.cellNoIndicator = this.add.image(0, 0, 'hud_no_cell').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.6).setVisible(false)
+    } else {
+      // Fallback: red semi-transparent square with X
+      const noCell = this.add.graphics().setDepth(5).setVisible(false)
+      noCell.fillStyle(0xe74c3c, 0.3)
+      noCell.fillRect(-TILE / 2, -TILE / 2, TILE, TILE)
+      noCell.lineStyle(2, 0xe74c3c, 0.6)
+      noCell.strokeRect(-TILE / 2, -TILE / 2, TILE, TILE)
+      noCell.lineBetween(-TILE / 2 + 8, -TILE / 2 + 8, TILE / 2 - 8, TILE / 2 - 8)
+      noCell.lineBetween(TILE / 2 - 8, -TILE / 2 + 8, -TILE / 2 + 8, TILE / 2 - 8)
+      this.cellNoIndicator = noCell
+    }
 
     // Hover handler for cell indicators
     this.input.on('pointermove', (pointer) => {
@@ -193,12 +214,10 @@ export class GameScene extends Phaser.Scene {
     const musicKey = this.levelData.music
     if (!musicKey) return
     try {
-      if (this.sound.get(musicKey)) {
-        this.bgMusic = this.sound.get(musicKey)
-      } else if (this.cache.audio.exists(musicKey)) {
+      // Stop any leftover music from menu or previous level
+      this.sound.stopAll()
+      if (this.cache.audio.exists(musicKey)) {
         this.bgMusic = this.sound.add(musicKey, { loop: true, volume: 0.3 })
-      }
-      if (this.bgMusic && !this.bgMusic.isPlaying) {
         this.bgMusic.play()
       }
     } catch (e) {
@@ -452,7 +471,6 @@ export class GameScene extends Phaser.Scene {
   setSpeed(speed) {
     this.gameSpeed = speed
     this.time.timeScale = speed
-    this.physics.world.timeScale = 1 / speed
     // Update button visuals
     if (this.ffBtn) {
       const ffKey = speed === 2 ? 'hud_ff_on' : 'hud_ff'
@@ -922,8 +940,16 @@ export class GameScene extends Phaser.Scene {
     const repairCost = needsRepair ? Math.floor((tower.maxHp - tower.hp) * 0.3) : 0
 
     // Show range
-    this.rangeIndicator.setPosition(tower.x, tower.y)
-    this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
+    if (this.rangeIndicator._isFallbackGraphics) {
+      this.rangeIndicator.clear()
+      this.rangeIndicator.lineStyle(2, 0x3498db, 0.4)
+      this.rangeIndicator.fillStyle(0x3498db, 0.1)
+      this.rangeIndicator.fillCircle(tower.x, tower.y, tower.range)
+      this.rangeIndicator.strokeCircle(tower.x, tower.y, tower.range)
+    } else {
+      this.rangeIndicator.setPosition(tower.x, tower.y)
+      this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
+    }
     this.rangeIndicator.setVisible(true)
 
     const menuH = 45 + (upgrade ? 25 : 0) + (needsRepair ? 20 : 0)
@@ -1046,8 +1072,10 @@ export class GameScene extends Phaser.Scene {
       this.showBossWarning(wave)
     }
 
-    let totalToSpawn = 0
-    wave.enemies.forEach(group => { totalToSpawn += group.count })
+    // Track spawn counts to prevent premature wave completion
+    this.waveSpawnTotal = 0
+    this.waveSpawnCount = 0
+    wave.enemies.forEach(group => { this.waveSpawnTotal += group.count })
 
     wave.enemies.forEach(group => {
       const enemyDef = ENEMY_TYPES[group.type]
@@ -1059,6 +1087,7 @@ export class GameScene extends Phaser.Scene {
         callback: () => {
           if (this.gameOver) return
           this.spawnEnemy(enemyDef, group.type)
+          this.waveSpawnCount++
         },
       })
     })
@@ -1420,8 +1449,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Check wave complete
-    if (this.waveActive && this.enemies.length === 0) {
+    // Check wave complete (all enemies must have spawned AND been killed/exited)
+    if (this.waveActive && this.enemies.length === 0 && this.waveSpawnCount >= this.waveSpawnTotal) {
       this.waveActive = false
       this.currentWave++
 
@@ -1825,16 +1854,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   destroyTower(tower) {
+    tower.hp = 0
+    // Close tower menu if it's open for this tower
+    if (this.towerMenu) {
+      try { this.towerMenu.destroy() } catch (e) {}
+      this.towerMenu = null
+      this.rangeIndicator.setVisible(false)
+    }
     this.tweens.add({
       targets: tower.sprite,
       alpha: 0, scaleX: 0.3, scaleY: 0.3, duration: 300,
       onComplete: () => {
-        tower.sprite.destroy()
-        tower.hpBg.destroy()
-        tower.hpBar.destroy()
+        try {
+          if (tower.sprite && tower.sprite.active) tower.sprite.destroy()
+          if (tower.hpBg && tower.hpBg.active) tower.hpBg.destroy()
+          if (tower.hpBar && tower.hpBar.active) tower.hpBar.destroy()
+        } catch (e) {}
       },
     })
-    tower.hp = 0
   }
 
   removeEnemy(enemy) {

@@ -27,10 +27,6 @@ export default function GameWrapper({ user, onLogout, apiBase }) {
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       scene: [BootScene, MenuScene, LevelSelectScene, ShopScene, StatsScene, GameScene],
-      physics: {
-        default: 'arcade',
-        arcade: { debug: false },
-      },
       input: {
         activePointers: 3,
       },
