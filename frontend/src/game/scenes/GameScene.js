@@ -1093,7 +1093,7 @@ export class GameScene extends Phaser.Scene {
     let nearest = null
     let nearDist = 30 // Click tolerance radius
     this.enemies.forEach(enemy => {
-      if (!enemy.sprite.active) return
+      if (!enemy.sprite || !enemy.sprite.active) return
       const dx = enemy.sprite.x - x
       const dy = enemy.sprite.y - y
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -1768,12 +1768,12 @@ export class GameScene extends Phaser.Scene {
     // Update manual target indicator position
     if (this.manualTarget) {
       const mt = this.manualTarget
-      const dead = mt.isChest ? mt.opened : (!mt.sprite.active || mt.hp <= 0)
+      const dead = mt.isChest ? mt.opened : (!mt.sprite || !mt.sprite.active || mt.hp <= 0)
       if (dead) {
         this.clearManualTarget()
       } else if (this.targetIndicator) {
-        const tx = mt.isChest ? mt.x : mt.sprite.x
-        const ty = mt.isChest ? mt.y : mt.sprite.y
+        const tx = mt.isChest ? mt.x : (mt.sprite ? mt.sprite.x : mt.x)
+        const ty = mt.isChest ? mt.y : (mt.sprite ? mt.sprite.y : mt.y)
         this.targetIndicator.setPosition(tx, ty - 25)
       }
     }
@@ -1800,7 +1800,9 @@ export class GameScene extends Phaser.Scene {
 
     // Gel Cube tower damage + enemy melee attacks
     this.enemies.forEach(enemy => {
-      if (!enemy.sprite.active) return
+      if (!enemy.sprite || !enemy.sprite.active) return
+      // Skip enemies that can't damage towers (performance: avoids O(n*m) for harmless enemies)
+      if (!enemy.towerDamage && !enemy.melee) return
       this.towers.forEach(tower => {
         if (tower.hp <= 0) return
         const dx = enemy.sprite.x - tower.x
@@ -1988,7 +1990,7 @@ export class GameScene extends Phaser.Scene {
       if (proj.target) {
         if (proj.target.isChest) {
           // Chest targets are static — no position update needed
-        } else if (proj.target.sprite.active) {
+        } else if (proj.target.sprite && proj.target.sprite.active) {
           proj.targetX = proj.target.sprite.x
           proj.targetY = proj.target.sprite.y
         }
@@ -2035,13 +2037,15 @@ export class GameScene extends Phaser.Scene {
               onComplete: () => mRing.destroy(),
             })
             this.cameras.main.shake(150, 0.003)
-            this.enemies.forEach(e => {
-              if (!e.sprite.active) return
+            // Collect targets first to avoid modifying array during iteration
+            const mineTargets = this.enemies.filter(e => {
+              if (!e.sprite || !e.sprite.active) return false
               const edx = e.sprite.x - dep.x
               const edy = e.sprite.y - dep.y
-              if (Math.sqrt(edx * edx + edy * edy) <= dep.radius) {
-                this.damageEnemy(e, dep.damage)
-              }
+              return Math.sqrt(edx * edx + edy * edy) <= dep.radius
+            })
+            mineTargets.forEach(e => {
+              if (e.hp > 0) this.damageEnemy(e, dep.damage)
             })
             return false
           }
@@ -2078,14 +2082,15 @@ export class GameScene extends Phaser.Scene {
 
         // Damage + slow enemies inside gas cloud
         this.enemies.forEach(enemy => {
-          if (!enemy.sprite.active) return
+          if (!enemy.sprite || !enemy.sprite.active || enemy.hp <= 0) return
           const dx = enemy.sprite.x - dep.x
           const dy = enemy.sprite.y - dep.y
           if (Math.sqrt(dx * dx + dy * dy) <= dep.radius) {
             this.damageEnemy(enemy, (dep.dps * speedDelta) / 1000)
             // Gas slows enemies by 40%
             enemy.slowTimer = Math.max(enemy.slowTimer || 0, 500)
-            enemy.slowFactor = Math.min(enemy.slowFactor || 1, 0.6)
+            enemy.speed = enemy.baseSpeed * 0.6
+            if (enemy.sprite && enemy.sprite.active) enemy.sprite.setTint(0x2ecc71)
           }
         })
         return true
@@ -2109,6 +2114,8 @@ export class GameScene extends Phaser.Scene {
     if (this.waveActive && this.enemies.length === 0 && this.waveSpawnCount >= this.waveSpawnTotal) {
       this.waveActive = false
       this.currentWave++
+      this.comboCount = 0
+      this.comboTimer = 0
 
       if (this.goldWaveBonus > 0) {
         this.gold += this.goldWaveBonus
@@ -2264,14 +2271,17 @@ export class GameScene extends Phaser.Scene {
       return
     }
 
+    // Save position before damaging (enemy might die)
+    const primaryX = primary.sprite.x
+    const primaryY = primary.sprite.y
     this.damageEnemy(primary, tower.damage, tower.type)
 
     const bolt = this.add.graphics().setDepth(11)
-    this.drawLightningBolt(bolt, tower.x, tower.y, primary.sprite.x, primary.sprite.y, 0x9b59b6)
+    this.drawLightningBolt(bolt, tower.x, tower.y, primaryX, primaryY, 0x9b59b6)
 
     const hit = new Set([primary])
-    let lastX = primary.sprite.x
-    let lastY = primary.sprite.y
+    let lastX = primaryX
+    let lastY = primaryY
     let chainDamage = tower.damage
 
     for (let chain = 0; chain < 4; chain++) {
@@ -2281,7 +2291,7 @@ export class GameScene extends Phaser.Scene {
       let nearest = null
       let nearDist = Infinity
       this.enemies.forEach(enemy => {
-        if (!enemy.sprite.active || hit.has(enemy)) return
+        if (!enemy.sprite || !enemy.sprite.active || hit.has(enemy)) return
         const dx = enemy.sprite.x - lastX
         const dy = enemy.sprite.y - lastY
         const dist = Math.sqrt(dx * dx + dy * dy)
@@ -2293,13 +2303,16 @@ export class GameScene extends Phaser.Scene {
 
       if (!nearest) break
 
+      // Save position before damaging
+      const nx = nearest.sprite.x
+      const ny = nearest.sprite.y
       hit.add(nearest)
       this.damageEnemy(nearest, chainDamage, tower.type)
 
-      this.drawLightningBolt(bolt, lastX, lastY, nearest.sprite.x, nearest.sprite.y, 0x7b4fb6, Math.max(1, 2 - chain * 0.4))
+      this.drawLightningBolt(bolt, lastX, lastY, nx, ny, 0x7b4fb6, Math.max(1, 2 - chain * 0.4))
 
-      lastX = nearest.sprite.x
-      lastY = nearest.sprite.y
+      lastX = nx
+      lastY = ny
     }
 
     this.tweens.add({
@@ -2321,30 +2334,38 @@ export class GameScene extends Phaser.Scene {
 
     // Check if hitting a treasure chest
     if (proj.target && proj.target.isChest) {
-      if (!proj.target.opened) this.damageChest(proj.target, proj.damage)
+      if (!proj.target.opened && proj.target.sprite && proj.target.sprite.active) {
+        this.damageChest(proj.target, proj.damage)
+      }
       return
     }
 
     if (proj.splash > 0) {
       this.playSfx('sfx_catapult_impact', 0.2)
+      // Collect targets first to avoid modifying array during iteration
+      const splashTargets = []
       this.enemies.forEach(enemy => {
-        if (!enemy.sprite.active) return
+        if (!enemy.sprite || !enemy.sprite.active) return
         const dx = enemy.sprite.x - proj.targetX
         const dy = enemy.sprite.y - proj.targetY
         if (Math.sqrt(dx * dx + dy * dy) <= proj.splash) {
-          this.damageEnemy(enemy, proj.damage, proj.towerType)
-          // Apply slow to all enemies in splash radius (ice tower AoE slow)
-          if (proj.slow > 0) {
-            enemy.speed = enemy.baseSpeed * proj.slow
-            enemy.slowTimer = Math.max(enemy.slowTimer, proj.slowDuration)
-            enemy.sprite.setTint(0x00bcd4)
-          }
+          splashTargets.push(enemy)
         }
       })
-    } else if (proj.target && proj.target.sprite.active) {
+      splashTargets.forEach(enemy => {
+        if (enemy.hp <= 0) return
+        this.damageEnemy(enemy, proj.damage, proj.towerType)
+        // Apply slow to all enemies in splash radius (ice tower AoE slow)
+        if (proj.slow > 0 && enemy.sprite && enemy.sprite.active) {
+          enemy.speed = enemy.baseSpeed * proj.slow
+          enemy.slowTimer = Math.max(enemy.slowTimer, proj.slowDuration)
+          enemy.sprite.setTint(0x00bcd4)
+        }
+      })
+    } else if (proj.target && proj.target.sprite && proj.target.sprite.active) {
       this.damageEnemy(proj.target, proj.damage, proj.towerType)
       // Slow effect on single target
-      if (proj.slow > 0) {
+      if (proj.slow > 0 && proj.target.sprite && proj.target.sprite.active) {
         proj.target.speed = proj.target.baseSpeed * proj.slow
         proj.target.slowTimer = Math.max(proj.target.slowTimer, proj.slowDuration)
         proj.target.sprite.setTint(0x00bcd4)
@@ -2607,7 +2628,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   triggerBossAbility(enemy) {
-    if (!enemy.sprite.active || enemy.hp <= 0) return
+    if (!enemy.sprite || !enemy.sprite.active || enemy.hp <= 0) return
     const ex = enemy.sprite.x
     const ey = enemy.sprite.y
 
@@ -2633,16 +2654,19 @@ export class GameScene extends Phaser.Scene {
       // Gronk's Ground Slam — damages all towers in a radius
       const slamRadius = 120
       const slamDamage = 20
-      let hitAny = false
-      this.towers.forEach(tower => {
-        if (tower.hp <= 0) return
+      // Collect targets first to avoid modifying array during iteration
+      const slamTargets = this.towers.filter(tower => {
+        if (tower.hp <= 0) return false
         const dx = tower.x - ex, dy = tower.y - ey
-        if (Math.sqrt(dx * dx + dy * dy) <= slamRadius) {
-          tower.hp -= slamDamage
-          hitAny = true
-          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
-        }
+        return Math.sqrt(dx * dx + dy * dy) <= slamRadius
       })
+      slamTargets.forEach(tower => {
+        tower.hp -= slamDamage
+        tower._damageTintTimer = 300
+        tower.sprite.setTint(0xff4444)
+        if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
+      })
+      const hitAny = slamTargets.length > 0
       if (hitAny) {
         // Slam visual — expanding ring
         const ring = this.add.graphics().setDepth(11).setPosition(ex, ey)
@@ -2659,6 +2683,7 @@ export class GameScene extends Phaser.Scene {
       // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
       const wp = enemy.flyingWaypoints || this.waypoints
       const nextWp = wp[Math.min(enemy.waypointIndex, wp.length - 1)]
+      if (!nextWp) return
       const dirX = nextWp.x - ex, dirY = nextWp.y - ey
       const dirLen = Math.sqrt(dirX * dirX + dirY * dirY)
       if (dirLen < 1) return
@@ -2790,7 +2815,7 @@ export class GameScene extends Phaser.Scene {
     try { if (enemy.hpBar && enemy.hpBar.active) enemy.hpBar.destroy() } catch (e) {}
     try { if (enemy.namePlate) enemy.namePlate.destroy() } catch (e) {}
     // Clear scout tower lastTarget references to prevent memory leaks
-    this.towers.forEach(t => { if (t.lastTarget === enemy) t.lastTarget = null })
+    this.towers.forEach(t => { if (t.lastTarget === enemy) { t.lastTarget = null; t.stackCount = 0 } })
     // Clear manual target if this enemy was targeted
     if (this.manualTarget === enemy) this.clearManualTarget()
     this.enemies = this.enemies.filter(e => e !== enemy)
