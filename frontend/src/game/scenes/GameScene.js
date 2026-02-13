@@ -994,9 +994,10 @@ export class GameScene extends Phaser.Scene {
       const rdx = Math.abs(rune.c - col)
       const rdy = Math.abs(rune.r - row)
       if (rdx <= 2 && rdy <= 2) {
-        if (rune.type === 'damage') tower.damage = Math.round(tower.damage * 1.25)
-        if (rune.type === 'speed') tower.fireRate = Math.round(tower.fireRate * 0.8)
-        if (rune.type === 'range') tower.range = Math.round(tower.range * 1.2)
+        // Original game: runes DOUBLE the stat (confirmed via APK Help_RuneDamage/Speed/Distance)
+        if (rune.type === 'damage') tower.damage = Math.round(tower.damage * 2.0)
+        if (rune.type === 'speed') tower.fireRate = Math.round(tower.fireRate * 0.5)
+        if (rune.type === 'range') tower.range = Math.round(tower.range * 2.0)
         const runeColors = { damage: '#e74c3c', speed: '#3498db', range: '#2ecc71' }
         this.showFloatingText(tower.x, tower.y - 30, `${rune.type.toUpperCase()} RUNE!`, runeColors[rune.type])
         this.showTutorial('Tut_Runes')
@@ -1260,6 +1261,14 @@ export class GameScene extends Phaser.Scene {
     // Scale proportionally to maintain aspect ratio
     const eScale = targetSize / Math.max(sprite.width, sprite.height)
     sprite.setScale(eScale)
+    // Rescale on animation frame change to prevent size popping from inconsistent frame dimensions
+    if (hasAnim) {
+      sprite.on('animationupdate', () => {
+        const fw = sprite.frame.realWidth || sprite.frame.width
+        const fh = sprite.frame.realHeight || sprite.frame.height
+        sprite.setScale(targetSize / Math.max(fw, fh))
+      })
+    }
     this.enemyGroup.add(sprite)
 
     // Play walk animation if available
@@ -2164,7 +2173,8 @@ export class GameScene extends Phaser.Scene {
     const diffMults = { casual: 0.5, normal: 1.0, brutal: 1.5, inferno: 2.0 }
     const diffScoreMult = diffMults[this.difficulty] || 1.0
     const livesBonus = won ? this.lives * 50 : 0
-    const score = Math.round((this.enemiesKilled * 100 + this.gemsCollected * 50 + livesBonus + (won ? stars * 500 : 0)) * diffScoreMult)
+    const goldBonus = won ? Math.round(this.gold * 0.5) : 0
+    const score = Math.round((this.enemiesKilled * 100 + this.gemsCollected * 50 + livesBonus + goldBonus + (won ? stars * 500 : 0)) * diffScoreMult)
     setPersonalBest(`${this.levelIndex}_${this.difficulty}`, score, this.enemiesKilled)
 
     // Check bonus mission
@@ -2216,8 +2226,9 @@ export class GameScene extends Phaser.Scene {
         .setDisplaySize(400, 300).setDepth(50).setAlpha(0.4)
     }
 
-    const title = won ? 'VICTORY!' : 'DEFEAT'
-    const titleColor = won ? '#2ecc71' : '#e74c3c'
+    // Context-sensitive victory message (matching original APK)
+    const title = won ? (stars === 3 ? 'PERFECT!' : stars === 1 ? 'THAT WAS CLOSE!' : 'VICTORY!') : 'DEFEAT'
+    const titleColor = won ? (stars === 3 ? '#f1c40f' : '#2ecc71') : '#e74c3c'
 
     this.add.text(cx, cy - 80, title, {
       fontSize: '48px', color: titleColor, fontStyle: 'bold',

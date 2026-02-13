@@ -161,8 +161,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('proj_ballista', 'projectiles/ballista1_projectile-0.png')
     this.load.image('proj_ballista_2', 'projectiles/ballista2_projectile-0.png')
     this.load.image('proj_ballista_3', 'projectiles/ballista3_projectile-0.png')
-    this.load.image('proj_cannon', 'projectiles/ballista1_projectile-0.png')
-    this.load.image('proj_catapult', 'projectiles/ballista1_projectile-0.png')
+    // Cannon and catapult projectile sprites not available from APK — generated in generateFallbacks()
 
     // === Map textures ===
     this.load.image('map_grass', 'maps/grass_grnd.jpg')
@@ -307,6 +306,26 @@ export class BootScene extends Phaser.Scene {
     storm.fillCircle(4, 4, 4)
     storm.generateTexture('proj_storm', 8, 8)
     storm.destroy()
+
+    // Cannon projectile — dark iron cannonball
+    const cannon = this.make.graphics({ add: false })
+    cannon.fillStyle(0x333333)
+    cannon.fillCircle(6, 6, 6)
+    cannon.lineStyle(1, 0x555555)
+    cannon.strokeCircle(6, 6, 5)
+    cannon.generateTexture('proj_cannon', 12, 12)
+    cannon.destroy()
+
+    // Catapult projectile — brown boulder
+    const catapult = this.make.graphics({ add: false })
+    catapult.fillStyle(0x8b6914)
+    catapult.fillCircle(8, 8, 7)
+    catapult.fillStyle(0xa07828, 0.7)
+    catapult.fillCircle(6, 6, 4)
+    catapult.lineStyle(1, 0x5a4510)
+    catapult.strokeCircle(8, 8, 7)
+    catapult.generateTexture('proj_catapult', 16, 16)
+    catapult.destroy()
 
     // Button fallback (only used if wood_button asset fails to load)
     const btn = this.make.graphics({ add: false })
