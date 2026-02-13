@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { loadSave } from '../SaveManager.js'
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -110,7 +111,9 @@ export class MenuScene extends Phaser.Scene {
       // Stop only existing music tracks, not SFX
       this.stopMenuMusic()
       if (this.cache.audio.exists('music_menu')) {
-        this.menuMusic = this.sound.add('music_menu', { loop: true, volume: 0.3 })
+        const save = loadSave()
+        const musicVol = save.settings ? save.settings.musicVolume : 0.3
+        this.menuMusic = this.sound.add('music_menu', { loop: true, volume: musicVol })
         this.menuMusic.play()
       }
     } catch (e) { /* audio not available */ }

@@ -1,5 +1,5 @@
 // Persistent save manager using localStorage
-const SAVE_KEY = 'tnt_save_v1'
+export const SAVE_KEY = 'tnt_save_v1'
 
 const DEFAULT_SAVE = {
   gems: 100,
@@ -163,7 +163,7 @@ export function loadSave() {
   } catch (e) {
     console.warn('Failed to load save:', e)
   }
-  return { ...DEFAULT_SAVE, upgrades: { ...DEFAULT_SAVE.upgrades } }
+  return { ...DEFAULT_SAVE, upgrades: { ...DEFAULT_SAVE.upgrades }, settings: { ...DEFAULT_SAVE.settings } }
 }
 
 export function saveSave(data) {

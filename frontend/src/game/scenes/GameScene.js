@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
     const ups = this.saveData.upgrades
 
     this.gold = Math.round((this.levelData.startGold + (ups.goldStartBoost || 0) * 20) * this.diffMult.gold)
+    this.peakGold = this.gold
     this.lives = Math.round((this.levelData.lives + (ups.baseHealthBoost || 0)) * this.diffMult.lives)
     this.startLives = this.lives
 
@@ -1671,6 +1672,9 @@ export class GameScene extends Phaser.Scene {
 
     const speedDelta = delta * this.gameSpeed
 
+    // Track peak gold for bonus missions
+    if (this.gold > this.peakGold) this.peakGold = this.gold
+
     // Combo timer decay
     if (this.comboTimer > 0) {
       this.comboTimer -= speedDelta
@@ -2909,8 +2913,8 @@ export class GameScene extends Phaser.Scene {
         if (check === 'gems_20' && this.gemsCollected >= 20) completed = true
         if (check === 'gems_25' && this.gemsCollected >= 25) completed = true
         if (check === 'gems_35' && this.gemsCollected >= 35) completed = true
-        if (check === 'gold_400' && this.gold >= 400) completed = true
-        if (check === 'gold_500' && this.gold >= 500) completed = true
+        if (check === 'gold_400' && this.peakGold >= 400) completed = true
+        if (check === 'gold_500' && this.peakGold >= 500) completed = true
         if (check === 'sell_5' && this.towersSold >= 5) completed = true
         if (check === 'build_storm_3' && this.stormTowersBuilt >= 3) completed = true
         if (check === 'build_15' && this.towersBuilt >= 15) completed = true

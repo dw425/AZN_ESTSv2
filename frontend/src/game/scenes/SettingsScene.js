@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { loadSave, saveSave } from '../SaveManager.js'
+import { loadSave, saveSave, SAVE_KEY } from '../SaveManager.js'
 
 export class SettingsScene extends Phaser.Scene {
   constructor() {
@@ -49,7 +49,10 @@ export class SettingsScene extends Phaser.Scene {
     // Music Volume slider
     this.createSlider(cx, y, 'Music Volume', settings.musicVolume, (val) => {
       settings.musicVolume = val
-      this.sound.volume = val
+      // Adjust only currently playing music tracks, not global volume
+      this.sound.sounds.forEach(s => {
+        if (s.key && s.key.startsWith('music_')) s.setVolume(val)
+      })
     })
     y += 70
 
@@ -91,7 +94,7 @@ export class SettingsScene extends Phaser.Scene {
     }).setOrigin(0.5).setInteractive({ useHandCursor: true })
     resetAllBtn.on('pointerdown', () => {
       if (this._confirmReset) {
-        localStorage.removeItem('tnt_save_v1')
+        localStorage.removeItem(SAVE_KEY)
         this.showFloatingText(cx, y - 20, 'Progress Reset! Restarting...', '#e74c3c')
         this.time.delayedCall(1500, () => this.scene.start('MenuScene'))
       } else {

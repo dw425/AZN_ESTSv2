@@ -748,7 +748,7 @@ export const LEVELS = [
     music: 'music_desert',
     startGold: 320,
     lives: 12,
-    bonusMission: 14,
+    bonusMission: 15,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [2,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
