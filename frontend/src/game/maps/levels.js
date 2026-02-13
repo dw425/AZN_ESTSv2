@@ -6,6 +6,7 @@ export const TOWER_TYPES = {
     textures: ['tower_ballista', 'tower_ballista_2', 'tower_ballista_3'],
     hudIcon: 'hud_ballista',
     projectile: 'proj_ballista',
+    damageType: 'physical',
     cost: 50,
     damage: 20,
     range: 160,
@@ -21,6 +22,7 @@ export const TOWER_TYPES = {
     textures: ['tower_cannon', 'tower_cannon_2', 'tower_cannon_3'],
     hudIcon: 'hud_cannon',
     projectile: 'proj_cannon',
+    damageType: 'physical',
     cost: 100,
     damage: 60,
     range: 110,
@@ -37,6 +39,7 @@ export const TOWER_TYPES = {
     textures: ['tower_catapult', 'tower_catapult_2', 'tower_catapult_3'],
     hudIcon: 'hud_catapult',
     projectile: 'proj_catapult',
+    damageType: 'physical',
     cost: 120,
     damage: 80,
     range: 180,
@@ -53,6 +56,7 @@ export const TOWER_TYPES = {
     textures: ['tower_scout', 'tower_scout_2', 'tower_scout_3'],
     hudIcon: 'hud_scout',
     projectile: 'projectile_default',
+    damageType: 'magical',
     cost: 40,
     damage: 12,
     range: 140,
@@ -68,6 +72,7 @@ export const TOWER_TYPES = {
     textures: ['tower_storm', 'tower_storm_2', 'tower_storm_3'],
     hudIcon: 'hud_wizard',
     projectile: 'proj_storm',
+    damageType: 'magical',
     cost: 80,
     damage: 35,
     range: 130,
@@ -83,6 +88,7 @@ export const TOWER_TYPES = {
     textures: ['tower_winter', 'tower_winter_2', 'tower_winter_3'],
     hudIcon: 'hud_ice',
     projectile: 'proj_ice',
+    damageType: 'magical',
     cost: 70,
     damage: 10,
     range: 130,
@@ -140,6 +146,7 @@ export const ENEMY_TYPES = {
     reward: 12,
     damage: 1,
     regens: 3, // regenerates 3 HP per second
+    magResist: 0.5, // 50% magic resistance — trolls shrug off spells
   },
   orc: {
     name: 'Orc',
@@ -157,6 +164,7 @@ export const ENEMY_TYPES = {
     reward: 25,
     damage: 2,
     melee: true, // extra tower damage up close
+    magResist: 0.3, // 30% magic resistance
   },
   gelcube: {
     name: 'Gel Cube',
@@ -166,6 +174,7 @@ export const ENEMY_TYPES = {
     reward: 18,
     damage: 1,
     towerDamage: 10, // damages towers it slides past (DPS)
+    physResist: 0.5, // 50% physical resistance — gelatinous, arrows pass through
   },
   rocketgoblin: {
     name: 'Rocket Goblin',
@@ -184,6 +193,7 @@ export const ENEMY_TYPES = {
     reward: 30,
     damage: 2,
     flying: true, // immune to mines
+    physResist: 0.4, // 40% physical resistance — magical creature
   },
   giant: {
     name: 'Giant',
@@ -193,6 +203,7 @@ export const ENEMY_TYPES = {
     reward: 40,
     damage: 3,
     melee: true, // strong melee attack on towers
+    magResist: 0.4, // 40% magic resistance — brute shrugs off spells
   },
   dragon: {
     name: 'Dragon',
@@ -202,6 +213,8 @@ export const ENEMY_TYPES = {
     reward: 50,
     damage: 3,
     flying: true,
+    physResist: 0.25, // 25% physical resistance — tough scales
+    magResist: 0.25, // 25% magic resistance — magical nature
   },
   // Boss variants
   boss_beholder: {
@@ -214,6 +227,8 @@ export const ENEMY_TYPES = {
     flying: true,
     boss: true,
     size: 1.5,
+    physResist: 0.5, // stronger resistance than regular
+    bossAbility: 'eye_beam', // damages random tower periodically
   },
   boss_ogre: {
     name: 'Gronk the Brutilator',
@@ -225,6 +240,8 @@ export const ENEMY_TYPES = {
     melee: true,
     boss: true,
     size: 1.5,
+    magResist: 0.5,
+    bossAbility: 'ground_slam', // damages nearby towers in radius
   },
   boss_dragon: {
     name: 'Ainamarth the Dragon',
@@ -236,6 +253,9 @@ export const ENEMY_TYPES = {
     flying: true,
     boss: true,
     size: 1.8,
+    physResist: 0.35,
+    magResist: 0.35,
+    bossAbility: 'fire_breath', // damages towers in a line ahead
   },
 }
 
@@ -299,6 +319,7 @@ export const TUTORIALS = {
   Tut_QuickUsePowderKeg: { title: 'Powder Keg', msg: 'Select the keg icon and tap the map to deploy an explosive barrel!' },
   Tut_QuickUseMines: { title: 'Land Mines', msg: 'Place mines on the path. They explode when enemies walk over them.' },
   Tut_QuickUseGas: { title: 'Poison Gas', msg: 'Deploy gas clouds to slow and damage enemies in an area.' },
+  Tut_DamageResist: { title: 'Resistance!', msg: 'Some enemies resist physical or magical damage. Mix tower types to counter resistances!' },
   Tut_TrollRegen: { title: 'Troll Shaman!', msg: 'Trolls regenerate health! Focus fire to take them down quickly.' },
   Tut_Slimes: { title: 'Slime Alert!', msg: 'Slimes split into 3 baby slimes when killed! Be prepared.' },
   Tut_GelCubes: { title: 'Jelly Cube!', msg: 'Gel Cubes damage your towers as they slide past. Watch your tower HP!' },

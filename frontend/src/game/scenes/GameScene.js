@@ -1224,7 +1224,8 @@ export class GameScene extends Phaser.Scene {
     menu.add(bg)
 
     const hpPct = Math.round(tower.hp / tower.maxHp * 100)
-    const info = this.add.text(0, -15, `${def.name} Lv${tower.level + 1} | DMG:${tower.damage} | HP:${hpPct}%`, {
+    const dmgLabel = def.damageType === 'physical' ? '\u2694' : '\u2728' // sword or sparkles
+    const info = this.add.text(0, -15, `${def.name} Lv${tower.level + 1} ${dmgLabel} | DMG:${tower.damage} | HP:${hpPct}%`, {
       fontSize: '10px', color: '#fff',
     }).setOrigin(0.5)
     menu.add(info)
@@ -1465,6 +1466,12 @@ export class GameScene extends Phaser.Scene {
       melee: def.melee || false,
       boss: def.boss || false,
       size: def.size || 1,
+      // Damage type resistances
+      physResist: def.physResist || 0,
+      magResist: def.magResist || 0,
+      // Boss special ability
+      bossAbility: def.bossAbility || null,
+      bossAbilityTimer: 0,
       // Flying enemies use their own direct waypoints
       flyingWaypoints,
       // Boss name plate
@@ -1477,6 +1484,11 @@ export class GameScene extends Phaser.Scene {
         fontSize: '10px', color: '#e74c3c', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(0.5).setDepth(9)
+    }
+
+    // Show resistance tutorial the first time a resistant enemy spawns
+    if (enemy.physResist > 0 || enemy.magResist > 0) {
+      this.showTutorial('Tut_DamageResist')
     }
 
     this.enemies.push(enemy)
@@ -1512,6 +1524,15 @@ export class GameScene extends Phaser.Scene {
       // Troll regen
       if (enemy.regens > 0 && enemy.hp < enemy.maxHp) {
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + (enemy.regens * speedDelta) / 1000)
+      }
+
+      // Boss special abilities — periodic effects
+      if (enemy.bossAbility) {
+        enemy.bossAbilityTimer -= speedDelta
+        if (enemy.bossAbilityTimer <= 0) {
+          this.triggerBossAbility(enemy)
+          enemy.bossAbilityTimer = 5000 // Every 5 seconds
+        }
       }
 
       // Flying enemies use their own direct path (spawn → exit)
@@ -2105,12 +2126,28 @@ export class GameScene extends Phaser.Scene {
 
   damageEnemy(enemy, damage, towerType) {
     if (enemy.hp <= 0) return // Already dead — prevent double-kill crash from splash
+
+    // Apply damage type resistance (physical/magical)
+    if (towerType && TOWER_TYPES[towerType]) {
+      const dmgType = TOWER_TYPES[towerType].damageType
+      if (dmgType === 'physical' && enemy.physResist) {
+        damage = Math.round(damage * (1 - enemy.physResist))
+      } else if (dmgType === 'magical' && enemy.magResist) {
+        damage = Math.round(damage * (1 - enemy.magResist))
+      }
+    }
+    damage = Math.max(1, damage) // Always deal at least 1 damage
     enemy.hp -= damage
 
-    // Damage number float (only for significant hits)
-    if (damage >= 10) {
+    // Damage number float (only for significant hits) — tint based on resistance
+    const resisted = towerType && TOWER_TYPES[towerType] && (
+      (TOWER_TYPES[towerType].damageType === 'physical' && enemy.physResist > 0) ||
+      (TOWER_TYPES[towerType].damageType === 'magical' && enemy.magResist > 0)
+    )
+    if (damage >= 10 || resisted) {
+      const dmgColor = resisted ? '#888' : '#fff'
       const dmgText = this.add.text(enemy.sprite.x + Phaser.Math.Between(-8, 8), enemy.sprite.y - 15, Math.round(damage), {
-        fontSize: '10px', color: '#fff',
+        fontSize: resisted ? '9px' : '10px', color: dmgColor,
         stroke: '#000', strokeThickness: 1,
       }).setOrigin(0.5).setDepth(15)
       this.tweens.add({
@@ -2224,9 +2261,29 @@ export class GameScene extends Phaser.Scene {
     const x = enemy.sprite.x
     const y = enemy.sprite.y
 
-    // Small particle burst
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2
+    // Create a death ghost — copy of enemy sprite that fades and floats up
+    try {
+      const ghost = this.add.image(x, y, enemy.sprite.texture.key)
+        .setDepth(12).setAlpha(0.7)
+      ghost.setScale(enemy.sprite.scaleX, enemy.sprite.scaleY)
+      ghost.setFlipX(enemy.sprite.flipX)
+      ghost.setTint(enemy.boss ? 0xff0000 : 0xff6666)
+      this.tweens.add({
+        targets: ghost,
+        y: y - (enemy.boss ? 40 : 25),
+        alpha: 0,
+        scaleX: ghost.scaleX * 0.3,
+        scaleY: ghost.scaleY * 0.3,
+        duration: enemy.boss ? 800 : 500,
+        ease: 'Power2',
+        onComplete: () => ghost.destroy(),
+      })
+    } catch (e) { /* sprite texture unavailable */ }
+
+    // Particle burst
+    const count = enemy.boss ? 10 : 6
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2
       const particle = this.add.graphics().setDepth(12)
       const pColor = enemy.boss ? 0xe74c3c : 0xf1c40f
       particle.fillStyle(pColor, 0.8)
@@ -2317,6 +2374,91 @@ export class GameScene extends Phaser.Scene {
         targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400,
         onComplete: () => boom.destroy(),
       })
+    }
+  }
+
+  triggerBossAbility(enemy) {
+    if (!enemy.sprite.active || enemy.hp <= 0) return
+    const ex = enemy.sprite.x
+    const ey = enemy.sprite.y
+
+    if (enemy.bossAbility === 'eye_beam') {
+      // Xantem's Eye Beam — damages a random tower in range
+      const inRange = this.towers.filter(t => {
+        if (t.hp <= 0) return false
+        const dx = t.x - ex, dy = t.y - ey
+        return Math.sqrt(dx * dx + dy * dy) < 250
+      })
+      if (inRange.length > 0) {
+        const target = inRange[Math.floor(Math.random() * inRange.length)]
+        target.hp -= 25
+        // Beam visual
+        const beam = this.add.graphics().setDepth(11)
+        beam.lineStyle(3, 0xe74c3c, 0.8)
+        beam.lineBetween(ex, ey, target.x, target.y)
+        this.tweens.add({ targets: beam, alpha: 0, duration: 300, onComplete: () => beam.destroy() })
+        this.showFloatingText(target.x, target.y - 20, '-25 HP', '#e74c3c')
+        if (target.hp <= 0) { target.hp = 0; this.destroyTower(target) }
+      }
+    } else if (enemy.bossAbility === 'ground_slam') {
+      // Gronk's Ground Slam — damages all towers in a radius
+      const slamRadius = 120
+      const slamDamage = 20
+      let hitAny = false
+      this.towers.forEach(tower => {
+        if (tower.hp <= 0) return
+        const dx = tower.x - ex, dy = tower.y - ey
+        if (Math.sqrt(dx * dx + dy * dy) <= slamRadius) {
+          tower.hp -= slamDamage
+          hitAny = true
+          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
+        }
+      })
+      if (hitAny) {
+        // Slam visual — expanding ring
+        const ring = this.add.graphics().setDepth(11).setPosition(ex, ey)
+        ring.lineStyle(3, 0xf39c12, 0.7)
+        ring.strokeCircle(0, 0, 20)
+        this.tweens.add({
+          targets: ring, scaleX: slamRadius / 20, scaleY: slamRadius / 20,
+          alpha: 0, duration: 400, onComplete: () => ring.destroy(),
+        })
+        this.showFloatingText(ex, ey - 30, 'GROUND SLAM!', '#f39c12')
+      }
+    } else if (enemy.bossAbility === 'fire_breath') {
+      // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
+      const wp = enemy.flyingWaypoints || this.waypoints
+      const nextWp = wp[Math.min(enemy.waypointIndex, wp.length - 1)]
+      const dirX = nextWp.x - ex, dirY = nextWp.y - ey
+      const dirLen = Math.sqrt(dirX * dirX + dirY * dirY)
+      if (dirLen < 1) return
+      const nx = dirX / dirLen, ny = dirY / dirLen
+      const breathRange = 150
+      const breathDamage = 15
+      this.towers.forEach(tower => {
+        if (tower.hp <= 0) return
+        const dx = tower.x - ex, dy = tower.y - ey
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist > breathRange) return
+        // Check if tower is roughly in front of dragon (dot product > 0.3)
+        const dot = (dx / dist) * nx + (dy / dist) * ny
+        if (dot > 0.3) {
+          tower.hp -= breathDamage
+          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
+        }
+      })
+      // Fire breath visual — cone shape
+      const fb = this.add.graphics().setDepth(11).setPosition(ex, ey)
+      fb.fillStyle(0xff4500, 0.4)
+      fb.beginPath()
+      fb.moveTo(0, 0)
+      const angle = Math.atan2(ny, nx)
+      fb.lineTo(Math.cos(angle - 0.4) * breathRange, Math.sin(angle - 0.4) * breathRange)
+      fb.lineTo(Math.cos(angle + 0.4) * breathRange, Math.sin(angle + 0.4) * breathRange)
+      fb.closePath()
+      fb.fillPath()
+      this.tweens.add({ targets: fb, alpha: 0, duration: 500, onComplete: () => fb.destroy() })
+      this.showFloatingText(ex, ey - 30, 'FIRE BREATH!', '#ff4500')
     }
   }
 
