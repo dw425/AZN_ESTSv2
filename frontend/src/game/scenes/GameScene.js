@@ -125,6 +125,19 @@ export class GameScene extends Phaser.Scene {
         try { if (g.zone) g.zone.destroy() } catch (e) {}
       })
       this.gemDrops = []
+      this.towers.forEach(t => {
+        try { if (t.sprite && t.sprite.active) t.sprite.destroy() } catch (e) {}
+        try { if (t.hpBg && t.hpBg.active) t.hpBg.destroy() } catch (e) {}
+        try { if (t.hpBar && t.hpBar.active) t.hpBar.destroy() } catch (e) {}
+      })
+      this.towers = []
+      this.enemies.forEach(e => {
+        try { if (e.sprite && e.sprite.active) e.sprite.destroy() } catch (e2) {}
+        try { if (e.hpBg && e.hpBg.active) e.hpBg.destroy() } catch (e2) {}
+        try { if (e.hpBar && e.hpBar.active) e.hpBar.destroy() } catch (e2) {}
+        try { if (e.namePlate) e.namePlate.destroy() } catch (e2) {}
+      })
+      this.enemies = []
       if (this.towerMenu) { try { this.towerMenu.destroy() } catch (e) {} }
       if (this.targetIndicator) { try { this.targetIndicator.destroy() } catch (e) {} }
       this._goldDeposits = []
@@ -639,10 +652,12 @@ export class GameScene extends Phaser.Scene {
       this.pauseMenu = null
       this.paused = false
       this.time.paused = false // Resume timer events (wave spawning, etc.)
+      this.tweens.resumeAll()
       return
     }
     this.paused = true
     this.time.paused = true // Freeze timer events so enemies don't spawn during pause
+    this.tweens.pauseAll() // Freeze visual animations during pause
 
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
@@ -653,7 +668,7 @@ export class GameScene extends Phaser.Scene {
     backdrop.fillStyle(0x000000, 0.7)
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
     backdrop.setInteractive(new Phaser.Geom.Rectangle(-cx, -cy, cx * 2, cy * 2), Phaser.Geom.Rectangle.Contains)
-    backdrop.on('pointerdown', () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false })
+    backdrop.on('pointerdown', () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false; this.tweens.resumeAll() })
     container.add(backdrop)
 
     // Panel
@@ -678,7 +693,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5))
 
     const buttons = [
-      { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false } },
+      { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false; this.tweens.resumeAll() } },
       { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty }) } },
       { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.stopMusic(); this.scene.start('LevelSelectScene') } },
     ]
@@ -1720,7 +1735,7 @@ export class GameScene extends Phaser.Scene {
       const dy = target.y - enemy.sprite.y
       const dist = Math.sqrt(dx * dx + dy * dy)
 
-      if (dist < 5) {
+      if (dist < 10) {
         enemy.waypointIndex++
         if (enemy.waypointIndex >= wp.length) {
           this.lives -= enemy.damage
@@ -1838,7 +1853,7 @@ export class GameScene extends Phaser.Scene {
 
         // Melee enemies damage towers they pass near
         if (enemy.melee && dist < TILE * 1.2) {
-          const dps = enemy.damage * 10
+          const dps = enemy.boss ? 25 : enemy.damage * 10
           tower.hp -= (dps * speedDelta) / 1000
           if (!tower._damageTintTimer || tower._damageTintTimer <= 0) {
             tower.sprite.setTint(0xff4444)
@@ -2003,7 +2018,9 @@ export class GameScene extends Phaser.Scene {
         proj.sprite.setRotation(Math.atan2(dy, dx))
       }
 
-      if (proj.target) {
+      // Homing: update target position for straight projectiles only
+      // Arc projectiles (catapult/cannon) use fixed destination to avoid warped parabolas
+      if (proj.target && !proj.arc) {
         if (proj.target.isChest) {
           // Chest targets are static — no position update needed
         } else if (proj.target.sprite && proj.target.sprite.active) {
