@@ -93,7 +93,7 @@ export class StatsScene extends Phaser.Scene {
     }).setOrigin(0.5)
 
     const bests = save.personalBests || {}
-    const bestEntries = Object.entries(bests).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    const bestEntries = Object.entries(bests).sort((a, b) => (b[1].score || 0) - (a[1].score || 0)).slice(0, 5)
     if (bestEntries.length === 0) {
       this.add.text(cx, pbY + 30, 'No records yet — play some levels!', {
         fontSize: '12px', color: '#666',
@@ -105,7 +105,7 @@ export class StatsScene extends Phaser.Scene {
         this.add.text(panelX + 25, pbY + 25 + i * 22, `${name}`, {
           fontSize: '12px', color: '#aaa',
         })
-        this.add.text(panelX + 375, pbY + 25 + i * 22, `${score} pts`, {
+        this.add.text(panelX + 375, pbY + 25 + i * 22, `${score.score || score} pts`, {
           fontSize: '12px', color: '#f1c40f', fontStyle: 'bold',
         }).setOrigin(1, 0)
       })

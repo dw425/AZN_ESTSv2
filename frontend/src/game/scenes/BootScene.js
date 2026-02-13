@@ -180,8 +180,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('map_mine', 'maps/mine_grnd.jpg')
     this.load.image('map_lava', 'maps/lava_grnd.jpg')
     this.load.image('map_f1night', 'maps/f1night.jpg')
-    this.load.image('map_platform', 'maps/towerplatform.png')
-    this.load.image('map_path', 'maps/pathBrush.png')
+    // towerplatform.png and pathBrush.png available on disk but not needed
+    // (map backgrounds already show paths, cell indicators show buildable spots)
 
     // === Music (7 tracks) ===
     this.load.audio('music_farm', 'music/How it Begins (Farm).mp3')

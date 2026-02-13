@@ -37,7 +37,7 @@ export class GameScene extends Phaser.Scene {
       fireRate: 1 - (ups.towerFireRateBoost || 0) * 0.03,
       range: 1 + (ups.towerRangeBoost || 0) * 0.05,
       aoe: 1 + (ups.towerAoeBoost || 0) * 0.05,
-      iceSlow: 1 + (ups.towerIcyBoost || 0) * 0.03,
+      iceSlow: 1 - (ups.towerIcyBoost || 0) * 0.03,
     }
     this.goldWaveBonus = (ups.goldWaveBoost || 0) * 2
 
@@ -1509,6 +1509,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   fireChainLightning(tower, primary) {
+    // Play fire animation for storm tower
+    const stormFireAnims = [null, 'storm_2_fire', 'storm_3_fire']
+    const stormAnimKey = stormFireAnims[tower.level]
+    if (stormAnimKey && this.anims.exists(stormAnimKey) && tower.sprite.play) {
+      try { tower.sprite.play(stormAnimKey) } catch (e) {}
+    }
+    this.playSfx('sfx_lightning', 0.25)
+
     this.damageEnemy(primary, tower.damage, tower.type)
 
     const bolt = this.add.graphics().setDepth(11)
@@ -1857,7 +1865,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Save kill stats and personal best
-    addTotalKills(this.enemiesKilled)
+    addTotalKills(this.enemiesKilled, this.gemsCollected)
     const score = this.enemiesKilled * 100 + this.gemsCollected * 50 + (won ? stars * 500 : 0)
     setPersonalBest(`${this.levelIndex}_${this.difficulty}`, score, this.enemiesKilled)
 

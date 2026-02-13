@@ -236,9 +236,9 @@ export function hasTutorialSeen(tutId) {
   return save.tutorialsSeen[tutId] || false
 }
 
-export function addTotalKills(count) {
+export function addTotalKills(count, gemsEarned) {
   const save = loadSave()
   save.totalKills = (save.totalKills || 0) + count
-  save.totalGemsEarned = (save.totalGemsEarned || 0)
+  save.totalGemsEarned = (save.totalGemsEarned || 0) + (gemsEarned || 0)
   saveSave(save)
 }
