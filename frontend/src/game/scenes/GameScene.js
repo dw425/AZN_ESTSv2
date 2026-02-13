@@ -201,6 +201,13 @@ export class GameScene extends Phaser.Scene {
       '', { fontSize: '16px', color: '#aaa', stroke: '#000', strokeThickness: 2 }
     ).setOrigin(0.5).setDepth(20).setVisible(false)
 
+    // Wave preview text showing upcoming enemies
+    this.wavePreview = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.height - 115,
+      '', { fontSize: '10px', color: '#888', stroke: '#000', strokeThickness: 1 }
+    ).setOrigin(0.5).setDepth(20)
+    this.updateWavePreview()
+
     // Boss warning text (hidden)
     this.bossWarning = this.add.text(
       this.cameras.main.centerX, this.cameras.main.centerY - 30,
@@ -1102,6 +1109,7 @@ export class GameScene extends Phaser.Scene {
 
     this.waveActive = true
     this.startWaveBtn.setVisible(false)
+    if (this.wavePreview) this.wavePreview.setVisible(false)
     this.countdownText.setVisible(false)
 
     const wave = this.levelData.waves[this.currentWave]
@@ -1116,18 +1124,23 @@ export class GameScene extends Phaser.Scene {
     this.waveSpawnCount = 0
     wave.enemies.forEach(group => { this.waveSpawnTotal += group.count })
 
-    wave.enemies.forEach(group => {
+    wave.enemies.forEach((group, groupIdx) => {
       const enemyDef = ENEMY_TYPES[group.type]
       if (!enemyDef) return
 
-      this.time.addEvent({
-        delay: group.interval,
-        repeat: group.count - 1,
-        callback: () => {
-          if (this.gameOver) return
-          this.spawnEnemy(enemyDef, group.type)
-          this.waveSpawnCount++
-        },
+      // Stagger subsequent groups by 2 seconds each
+      const groupDelay = groupIdx * 2000
+
+      this.time.delayedCall(groupDelay, () => {
+        this.time.addEvent({
+          delay: group.interval,
+          repeat: group.count - 1,
+          callback: () => {
+            if (this.gameOver) return
+            this.spawnEnemy(enemyDef, group.type)
+            this.waveSpawnCount++
+          },
+        })
       })
     })
 
@@ -1420,9 +1433,14 @@ export class GameScene extends Phaser.Scene {
         return false
       }
 
-      const speed = (400 * speedDelta) / 1000
+      const projSpeeds = { ballista: 500, cannon: 350, catapult: 280, scout: 600, winter: 400, storm: 450 }
+      const baseSpeed = projSpeeds[proj.towerType] || 400
+      const speed = (baseSpeed * speedDelta) / 1000
       proj.sprite.x += (dx / dist) * speed
       proj.sprite.y += (dy / dist) * speed
+
+      // Rotate projectile to face target direction
+      proj.sprite.setRotation(Math.atan2(dy, dx))
 
       if (proj.target && proj.target.sprite.active) {
         proj.targetX = proj.target.sprite.x
@@ -1522,6 +1540,7 @@ export class GameScene extends Phaser.Scene {
         this.startWaveBtn.setText(`>> START WAVE ${this.currentWave + 1} <<`)
         this.startWaveBtn.setVisible(true)
         this.countdownText.setVisible(true)
+        this.updateWavePreview()
 
         // Bonus gold for starting early
         this.startWaveBtn.off('pointerdown')
@@ -2128,6 +2147,22 @@ export class GameScene extends Phaser.Scene {
         }
       })
     }
+  }
+
+  updateWavePreview() {
+    if (!this.wavePreview) return
+    const waveIdx = this.currentWave
+    if (waveIdx >= this.levelData.waves.length) {
+      this.wavePreview.setVisible(false)
+      return
+    }
+    const wave = this.levelData.waves[waveIdx]
+    const parts = wave.enemies.map(g => {
+      const def = ENEMY_TYPES[g.type]
+      return `${g.count}x ${def ? def.name : g.type}`
+    })
+    const preview = `Next: ${parts.join(', ')}${wave.boss ? ' [BOSS]' : ''}`
+    this.wavePreview.setText(preview).setVisible(true)
   }
 
   updateGameState() {
