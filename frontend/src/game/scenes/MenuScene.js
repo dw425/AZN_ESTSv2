@@ -31,15 +31,21 @@ export class MenuScene extends Phaser.Scene {
       }).setOrigin(0.5)
     }
 
-    // Play button
-    const playBtn = this.add.image(cx, cy + 40, 'button').setInteractive({ useHandCursor: true })
-    this.add.text(cx, cy + 40, 'PLAY', {
-      fontSize: '22px',
+    // Play button — use wood panel asset if available
+    const btnKey = this.textures.exists('wood_button') ? 'wood_button' : 'button'
+    const playBtn = this.add.image(cx, cy + 50, btnKey)
+      .setDisplaySize(180, 55)
+      .setInteractive({ useHandCursor: true })
+    this.add.text(cx, cy + 50, 'PLAY', {
+      fontSize: '24px',
+      fontFamily: 'Georgia, serif',
       fontStyle: 'bold',
       color: '#fff',
+      stroke: '#000',
+      strokeThickness: 3,
     }).setOrigin(0.5)
 
-    playBtn.on('pointerover', () => playBtn.setTint(0xcc3350))
+    playBtn.on('pointerover', () => playBtn.setTint(0xddaa66))
     playBtn.on('pointerout', () => playBtn.clearTint())
     playBtn.on('pointerdown', () => {
       this.scene.start('LevelSelectScene')

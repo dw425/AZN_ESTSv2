@@ -126,55 +126,34 @@ export class GameScene extends Phaser.Scene {
     const grid = this.levelData.grid
     const bgKey = this.levelData.mapBg || 'map_grass'
 
-    // Draw full background map image
+    // Draw full background map image — the map art already shows paths/terrain
     if (this.textures.exists(bgKey)) {
       this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, bgKey)
         .setDisplaySize(this.cameras.main.width, this.cameras.main.height)
     } else {
-      // Solid color fallback
       const bg = this.add.graphics()
       bg.fillStyle(0x2d5a27)
       bg.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
     }
 
-    // Draw subtle path overlay using graphics (no texture needed)
-    const pathGfx = this.add.graphics().setDepth(1)
-
+    // Find spawn and exit for small arrow indicators
     for (let r = 0; r < grid.length; r++) {
       for (let c = 0; c < grid[r].length; c++) {
-        const x = c * TILE
-        const y = r * TILE
         const val = grid[r][c]
+        const x = c * TILE + TILE / 2
+        const y = r * TILE + TILE / 2
 
-        if (val >= 1) {
-          // Subtle semi-transparent path highlight
-          pathGfx.fillStyle(0x8b7355, 0.25)
-          pathGfx.fillRect(x, y, TILE, TILE)
-        }
-
-        if (val === 0) {
-          // Show buildable spots with tower platform if available
-          if (this.textures.exists('map_platform')) {
-            this.add.image(x + TILE / 2, y + TILE / 2, 'map_platform')
-              .setDisplaySize(TILE - 4, TILE - 4)
-              .setAlpha(0.35)
-              .setDepth(1)
-          }
-        }
-
-        // Mark spawn
         if (val === 2) {
-          this.add.text(x + TILE / 2, y + TILE / 2, 'START', {
-            fontSize: '12px', color: '#ff0', fontStyle: 'bold',
-            stroke: '#000', strokeThickness: 2,
-          }).setOrigin(0.5).setDepth(2)
+          const arrow = this.add.text(x, y, '\u25B6', {
+            fontSize: '16px', color: '#2ecc71',
+            stroke: '#000', strokeThickness: 3,
+          }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
         }
-        // Mark exit
         if (val === 3) {
-          this.add.text(x + TILE / 2, y + TILE / 2, 'EXIT', {
-            fontSize: '12px', color: '#f00', fontStyle: 'bold',
-            stroke: '#000', strokeThickness: 2,
-          }).setOrigin(0.5).setDepth(2)
+          const flag = this.add.text(x, y, '\u2691', {
+            fontSize: '20px', color: '#e74c3c',
+            stroke: '#000', strokeThickness: 3,
+          }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
         }
       }
     }
