@@ -108,6 +108,8 @@ export class GameScene extends Phaser.Scene {
 
     // Build the path waypoints from the grid
     this.waypoints = this.buildPath(this.levelData.grid)
+    // Flying enemies take a direct path from spawn to exit (skip winding path)
+    this.flyWaypoints = [this.waypoints[0], this.waypoints[this.waypoints.length - 1]]
   }
 
   create() {
@@ -1787,8 +1789,8 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Flying enemies use their own direct path (spawn → exit)
-      const wp = this.waypoints
+      // Flying enemies take direct path (spawn → exit), ground enemies follow winding path
+      const wp = enemy.flying ? this.flyWaypoints : this.waypoints
       const target = wp[enemy.waypointIndex]
       if (!target) return
 
