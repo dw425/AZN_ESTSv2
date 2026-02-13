@@ -1272,13 +1272,22 @@ export class GameScene extends Phaser.Scene {
       sprite.setTint(0xff6666)
     }
 
+    // Flying enemies float above ground units with a shadow effect
+    if (def.flying) {
+      sprite.setDepth(8) // above ground enemies
+    }
+
     // HP bar
     const barWidth = Math.max(28, Math.round(sprite.displayWidth))
-    const hpBg = this.add.graphics().setDepth(7)
-    const hpBar = this.add.graphics().setDepth(8)
+    const hpBg = this.add.graphics().setDepth(def.flying ? 9 : 7)
+    const hpBar = this.add.graphics().setDepth(def.flying ? 10 : 8)
 
     const scaledHp = Math.round(def.hp * this.diffMult.enemyHp)
     const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed)
+
+    // Flying enemies take a direct path (spawn → exit), bypassing the winding ground path
+    const isFlying = def.flying || false
+    const flyingWaypoints = isFlying ? [this.waypoints[0], this.waypoints[this.waypoints.length - 1]] : null
 
     const enemy = {
       sprite, hpBg, hpBar, type,
@@ -1296,10 +1305,12 @@ export class GameScene extends Phaser.Scene {
       regens: def.regens || 0,
       towerDamage: def.towerDamage || 0,
       kamikaze: def.kamikaze || false,
-      flying: def.flying || false,
+      flying: isFlying,
       melee: def.melee || false,
       boss: def.boss || false,
       size: def.size || 1,
+      // Flying enemies use their own direct waypoints
+      flyingWaypoints,
       // Boss name plate
       namePlate: null,
     }
@@ -1339,7 +1350,9 @@ export class GameScene extends Phaser.Scene {
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + (enemy.regens * speedDelta) / 1000)
       }
 
-      const target = this.waypoints[enemy.waypointIndex]
+      // Flying enemies use their own direct path (spawn → exit)
+      const wp = enemy.flyingWaypoints || this.waypoints
+      const target = wp[enemy.waypointIndex]
       if (!target) return
 
       const dx = target.x - enemy.sprite.x
@@ -1348,7 +1361,7 @@ export class GameScene extends Phaser.Scene {
 
       if (dist < 5) {
         enemy.waypointIndex++
-        if (enemy.waypointIndex >= this.waypoints.length) {
+        if (enemy.waypointIndex >= wp.length) {
           this.lives -= enemy.damage
           this.removeEnemy(enemy)
           this.updateHUD()
@@ -1464,8 +1477,9 @@ export class GameScene extends Phaser.Scene {
       if (tower.hp <= 0) return
       if (time - tower.lastFired < tower.fireRate / this.gameSpeed) return
 
-      let closest = null
-      let closestDist = Infinity
+      // Target priority: "first" — the enemy furthest along the path (like original game)
+      let bestTarget = null
+      let bestPriority = -1
 
       const canTargetFlying = tower.type === 'scout' || tower.type === 'storm'
       this.enemies.forEach(enemy => {
@@ -1474,26 +1488,31 @@ export class GameScene extends Phaser.Scene {
         const dx = enemy.sprite.x - tower.x
         const dy = enemy.sprite.y - tower.y
         const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist <= tower.range && dist < closestDist) {
-          closest = enemy
-          closestDist = dist
+        if (dist <= tower.range) {
+          // Priority = waypointIndex (higher = further along path)
+          // Break ties by distance to next waypoint (closer = further along)
+          const priority = enemy.waypointIndex * 10000 - dist
+          if (priority > bestPriority) {
+            bestTarget = enemy
+            bestPriority = priority
+          }
         }
       })
 
-      if (closest) {
+      if (bestTarget) {
         if (tower.type === 'scout') {
-          if (tower.lastTarget === closest) {
+          if (tower.lastTarget === bestTarget) {
             tower.stackCount = (tower.stackCount || 0) + 1
           } else {
             tower.stackCount = 0
-            tower.lastTarget = closest
+            tower.lastTarget = bestTarget
           }
           const stackMult = 1 + tower.stackCount * 0.25
-          this.fireProjectile(tower, closest, Math.round(tower.damage * stackMult))
+          this.fireProjectile(tower, bestTarget, Math.round(tower.damage * stackMult))
         } else if (tower.type === 'storm') {
-          this.fireChainLightning(tower, closest)
+          this.fireChainLightning(tower, bestTarget)
         } else {
-          this.fireProjectile(tower, closest)
+          this.fireProjectile(tower, bestTarget)
         }
         tower.lastFired = time
       }
@@ -1516,11 +1535,37 @@ export class GameScene extends Phaser.Scene {
       const projSpeeds = { ballista: 500, cannon: 350, catapult: 280, scout: 600, winter: 400, storm: 450 }
       const baseSpeed = projSpeeds[proj.towerType] || 400
       const speed = (baseSpeed * speedDelta) / 1000
-      proj.sprite.x += (dx / dist) * speed
-      proj.sprite.y += (dy / dist) * speed
 
-      // Rotate projectile to face target direction
-      proj.sprite.setRotation(Math.atan2(dy, dx))
+      if (proj.arc && proj.arcTotalDist > 0) {
+        // Arc trajectory for catapult/cannon — parabolic Y offset
+        proj.arcProgress = Math.min(1, proj.arcProgress + speed / proj.arcTotalDist)
+        const t = proj.arcProgress
+        // Linear interpolation for base position
+        const baseX = proj.arcStartX + (proj.targetX - proj.arcStartX) * t
+        const baseY = proj.arcStartY + (proj.targetY - proj.arcStartY) * t
+        // Parabolic arc offset (peaks at t=0.5)
+        const arcOffset = -proj.arcHeight * 4 * t * (1 - t)
+        proj.sprite.x = baseX
+        proj.sprite.y = baseY + arcOffset
+        // Scale projectile slightly larger at peak for depth effect
+        const scaleMult = 1 + 0.3 * Math.sin(t * Math.PI)
+        proj.sprite.setScale(scaleMult)
+        // Rotate based on arc tangent
+        const tangentY = (proj.targetY - proj.arcStartY) + proj.arcHeight * 4 * (2 * t - 1)
+        const tangentX = proj.targetX - proj.arcStartX
+        proj.sprite.setRotation(Math.atan2(tangentY, tangentX))
+        // Check if arc is complete
+        if (t >= 1) {
+          this.handleProjectileHit(proj)
+          proj.sprite.destroy()
+          return false
+        }
+      } else {
+        proj.sprite.x += (dx / dist) * speed
+        proj.sprite.y += (dy / dist) * speed
+        // Rotate projectile to face target direction
+        proj.sprite.setRotation(Math.atan2(dy, dx))
+      }
 
       if (proj.target && proj.target.sprite.active) {
         proj.targetX = proj.target.sprite.x
@@ -1660,8 +1705,14 @@ export class GameScene extends Phaser.Scene {
       const upgKey = `${def.projectile}_${tower.level + 1}`
       if (this.textures.exists(upgKey)) texKey = upgKey
     }
+    // Projectile sizes per tower type — ballista arrows are long/narrow, boulders are large
+    const projSizes = {
+      ballista: [14, 6], cannon: [12, 12], catapult: [16, 16],
+      scout: [8, 8], storm: [10, 10], winter: [10, 8],
+    }
+    const [pw, ph] = projSizes[tower.type] || [10, 10]
     const sprite = this.add.image(tower.x, tower.y, texKey)
-      .setDisplaySize(10, 10)
+      .setDisplaySize(pw, ph)
       .setDepth(10)
     this.projectileGroup.add(sprite)
 
@@ -1694,6 +1745,13 @@ export class GameScene extends Phaser.Scene {
     const sfxList = towerSfx[tower.type]
     if (sfxList) this.playSfx(sfxList[Math.floor(Math.random() * sfxList.length)], 0.25)
 
+    // Calculate arc parameters for catapult/cannon projectiles
+    const startX = tower.x, startY = tower.y
+    const dx = enemy.sprite.x - startX
+    const dy = enemy.sprite.y - startY
+    const totalDist = Math.sqrt(dx * dx + dy * dy)
+    const useArc = tower.type === 'catapult' || tower.type === 'cannon'
+
     this.projectiles.push({
       sprite,
       target: enemy,
@@ -1704,6 +1762,13 @@ export class GameScene extends Phaser.Scene {
       slow: tower.slow,
       slowDuration: tower.slowDuration,
       towerType: tower.type,
+      // Arc trajectory data
+      arc: useArc,
+      arcStartX: startX,
+      arcStartY: startY,
+      arcTotalDist: totalDist,
+      arcHeight: useArc ? Math.max(30, totalDist * 0.3) : 0,
+      arcProgress: 0,
     })
   }
 
