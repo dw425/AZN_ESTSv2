@@ -127,12 +127,15 @@ export class GameScene extends Phaser.Scene {
     this.createBuildPanel()
     this.createWeaponBar()
 
-    // Range indicator (uses generated texture for clean rendering)
-    this.rangeIndicator = this.add.image(0, 0, 'range_circle').setVisible(false).setAlpha(0.5).setDepth(5)
+    // Range indicator — use original game asset if available
+    const rangeKey = this.textures.exists('hud_range') ? 'hud_range' : 'range_circle'
+    this.rangeIndicator = this.add.image(0, 0, rangeKey).setVisible(false).setAlpha(0.5).setDepth(5)
 
-    // Cell hover indicators (use generated textures to avoid Graphics corruption)
-    this.cellIndicator = this.add.image(0, 0, 'cell_ok').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
-    this.cellNoIndicator = this.add.image(0, 0, 'cell_no').setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
+    // Cell hover indicators — use original game assets for authentic look
+    const cellOkKey = this.textures.exists('hud_glow_cell') ? 'hud_glow_cell' : 'cell_ok'
+    const cellNoKey = this.textures.exists('hud_no_cell') ? 'hud_no_cell' : 'cell_no'
+    this.cellIndicator = this.add.image(0, 0, cellOkKey).setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
+    this.cellNoIndicator = this.add.image(0, 0, cellNoKey).setDisplaySize(TILE, TILE).setDepth(5).setAlpha(0.7).setVisible(false)
 
     // Hover handler for cell indicators
     this.input.on('pointermove', (pointer) => {
