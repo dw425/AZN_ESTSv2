@@ -622,6 +622,7 @@ export class GameScene extends Phaser.Scene {
         .on('pointerdown', () => this.showPauseMenu())
     }
 
+    this.setSpeed(1)
     this.updateHUD()
   }
 
@@ -698,7 +699,7 @@ export class GameScene extends Phaser.Scene {
 
     const buttons = [
       { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false; this.tweens.resumeAll() } },
-      { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty }) } },
+      { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, endless: this.endlessMode }) } },
       { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.stopMusic(); this.scene.start('LevelSelectScene') } },
     ]
 
@@ -1530,7 +1531,7 @@ export class GameScene extends Phaser.Scene {
     // Track spawn counts to prevent premature wave completion
     this.waveSpawnTotal = 0
     this.waveSpawnCount = 0
-    wave.enemies.forEach(group => { this.waveSpawnTotal += group.count })
+    wave.enemies.forEach(group => { if (ENEMY_TYPES[group.type]) this.waveSpawnTotal += group.count })
 
     wave.enemies.forEach((group, groupIdx) => {
       const enemyDef = ENEMY_TYPES[group.type]
@@ -2332,7 +2333,9 @@ export class GameScene extends Phaser.Scene {
         const dx = enemy.sprite.x - lastX
         const dy = enemy.sprite.y - lastY
         const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 100 && dist < nearDist) {
+        const tdx = enemy.sprite.x - tower.x
+        const tdy = enemy.sprite.y - tower.y
+        if (dist < 100 && Math.sqrt(tdx * tdx + tdy * tdy) <= tower.range * 1.5 && dist < nearDist) {
           nearest = enemy
           nearDist = dist
         }
@@ -2834,7 +2837,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   destroyTower(tower) {
+    if (tower._destroyed) return
+    tower._destroyed = true
     tower.hp = 0
+    try { if (tower.hpBg) tower.hpBg.setVisible(false) } catch (e) {}
+    try { if (tower.hpBar) tower.hpBar.setVisible(false) } catch (e) {}
     // Close tower menu if it's open for this tower
     if (this.towerMenu) {
       try { this.towerMenu.destroy() } catch (e) {}
@@ -3080,7 +3087,7 @@ export class GameScene extends Phaser.Scene {
       fontSize: '16px', color: '#888',
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     retryBtn.on('pointerdown', () => {
-      this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty })
+      this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, endless: this.endlessMode })
     })
   }
 
