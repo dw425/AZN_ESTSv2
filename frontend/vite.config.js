@@ -1,16 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/AZN_ESTSv2/',
   server: {
     proxy: {
       '/api': {
-        target: 'https://stock-trading-api-fcp5.onrender.com', // Your actual backend URL
+        target: 'http://localhost:10000',
         changeOrigin: true,
         secure: false,
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    assetsInlineLimit: 0,
   }
 })
