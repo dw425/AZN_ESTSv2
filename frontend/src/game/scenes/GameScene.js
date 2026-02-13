@@ -636,9 +636,11 @@ export class GameScene extends Phaser.Scene {
       this.pauseMenu.destroy()
       this.pauseMenu = null
       this.paused = false
+      this.time.paused = false // Resume timer events (wave spawning, etc.)
       return
     }
     this.paused = true
+    this.time.paused = true // Freeze timer events so enemies don't spawn during pause
 
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
@@ -649,7 +651,7 @@ export class GameScene extends Phaser.Scene {
     backdrop.fillStyle(0x000000, 0.7)
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
     backdrop.setInteractive(new Phaser.Geom.Rectangle(-cx, -cy, cx * 2, cy * 2), Phaser.Geom.Rectangle.Contains)
-    backdrop.on('pointerdown', () => { container.destroy(); this.pauseMenu = null; this.paused = false })
+    backdrop.on('pointerdown', () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false })
     container.add(backdrop)
 
     // Panel
@@ -674,7 +676,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5))
 
     const buttons = [
-      { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false } },
+      { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false } },
       { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty }) } },
       { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.stopMusic(); this.scene.start('LevelSelectScene') } },
     ]
@@ -1363,11 +1365,21 @@ export class GameScene extends Phaser.Scene {
           tower.totalInvestment += upgrade.cost
           tower.level++
           tower.damage = Math.round(upgrade.damage * this.boosts.damage)
-          tower.range = Math.round((upgrade.range || tower.range) * this.boosts.range)
-          tower.fireRate = Math.round((upgrade.fireRate || tower.fireRate) * this.boosts.fireRate)
+          tower.range = Math.round((upgrade.range || def.range) * this.boosts.range)
+          tower.fireRate = Math.max(200, Math.round((upgrade.fireRate || def.fireRate) * this.boosts.fireRate))
           if (upgrade.splash) tower.splash = Math.round(upgrade.splash * this.boosts.aoe)
           if (upgrade.slow) tower.slow = Math.max(upgrade.slow * this.boosts.iceSlow, 0.1)
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
+          // Re-apply rune bonuses (runes double the stat for nearby towers)
+          this.specialTiles.runes.forEach(rune => {
+            const rdx = Math.abs(rune.c - tower.gridCol)
+            const rdy = Math.abs(rune.r - tower.gridRow)
+            if (rdx <= 2 && rdy <= 2) {
+              if (rune.type === 'damage') tower.damage = Math.round(tower.damage * 2.0)
+              if (rune.type === 'speed') tower.fireRate = Math.round(tower.fireRate * 0.5)
+              if (rune.type === 'range') tower.range = Math.round(tower.range * 2.0)
+            }
+          })
           // Swap sprite texture and rescale for new proportions
           if (def.textures && def.textures[tower.level]) {
             const newTex = def.textures[tower.level]
@@ -1800,15 +1812,14 @@ export class GameScene extends Phaser.Scene {
         dep.timer -= speedDelta
         if (dep.timer <= 0) {
           dep.timer += dep.interval
+          this.gold += dep.goldPerTick
+          this.showFloatingText(dep.x, dep.y - 10, `+${dep.goldPerTick}`, '#f1c40f')
+          this.updateHUD()
           dep.goldRemaining -= dep.goldPerTick
           if (dep.goldRemaining <= 0) {
             dep.active = false
             if (dep.sprite) { try { dep.sprite.setAlpha(0.3) } catch (e) {} }
-            return
           }
-          this.gold += dep.goldPerTick
-          this.showFloatingText(dep.x, dep.y - 10, `+${dep.goldPerTick}`, '#f1c40f')
-          this.updateHUD()
         }
       })
     }
