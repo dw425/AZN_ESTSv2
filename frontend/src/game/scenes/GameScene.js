@@ -130,6 +130,12 @@ export class GameScene extends Phaser.Scene {
         this.cellNoIndicator.setVisible(false)
         return
       }
+      // Don't show indicators in HUD or build panel zones
+      if (pointer.y < 36 || pointer.y > this.cameras.main.height - 80) {
+        this.cellIndicator.setVisible(false)
+        this.cellNoIndicator.setVisible(false)
+        return
+      }
       const col = Math.floor(pointer.x / TILE)
       const row = Math.floor(pointer.y / TILE)
       const grid = this.levelData.grid
@@ -152,6 +158,31 @@ export class GameScene extends Phaser.Scene {
 
     // Click handler
     this.input.on('pointerdown', (pointer) => this.handleClick(pointer))
+
+    // Keyboard shortcuts
+    this.input.keyboard.on('keydown-P', () => this.showPauseMenu())
+    this.input.keyboard.on('keydown-SPACE', () => {
+      if (!this.waveActive && !this.gameOver) this.startNextWave()
+    })
+    this.input.keyboard.on('keydown-ESC', () => {
+      this.selectedTowerType = null
+      this.activeWeapon = null
+      this.cellIndicator.setVisible(false)
+      this.cellNoIndicator.setVisible(false)
+      this.updateBuildHighlights()
+      this.updateWeaponHighlights()
+    })
+    const towerKeys = Object.keys(TOWER_TYPES)
+    for (let i = 0; i < towerKeys.length && i < 6; i++) {
+      this.input.keyboard.on(`keydown-${i + 1}`, () => {
+        if (this.gameOver || this.paused) return
+        const key = towerKeys[i]
+        this.selectedTowerType = this.selectedTowerType === key ? null : key
+        this.activeWeapon = null
+        this.updateBuildHighlights()
+        this.updateWeaponHighlights()
+      })
+    }
 
     // Start wave button
     this.startWaveBtn = this.add.text(
@@ -545,7 +576,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   stopMusic() {
-    try { this.sound.stopAll() } catch (e) {}
+    try {
+      if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop()
+    } catch (e) {}
   }
 
   playSfx(key, volume) {
@@ -781,10 +814,8 @@ export class GameScene extends Phaser.Scene {
       }
       this.deployables.push(gasObj)
 
-      this.tweens.add({
-        targets: cloud, alpha: 0, duration: 5000,
-        onComplete: () => { cloud.destroy(); gasObj.active = false },
-      })
+      // Visual fade tied to timer expiry (not a fixed tween) — updated in deployables loop
+      // The cloud alpha is managed in the gas processing code below
     }
 
     this.activeWeapon = null
@@ -830,6 +861,13 @@ export class GameScene extends Phaser.Scene {
         if (!this.towers.find(t => t.gridCol === col && t.gridRow === row)) {
           this.placeTower(col, row, this.selectedTowerType)
         }
+      } else {
+        // Not enough gold feedback
+        this.showFloatingText(
+          col * TILE + TILE / 2, row * TILE + TILE / 2,
+          'Not enough gold!', '#e74c3c'
+        )
+        this.playSfx('sfx_beep', 0.3)
       }
     }
   }
@@ -856,7 +894,7 @@ export class GameScene extends Phaser.Scene {
       range: Math.round(def.range * this.boosts.range),
       fireRate: Math.max(200, Math.round(def.fireRate * this.boosts.fireRate)),
       splash: def.splash ? Math.round(def.splash * this.boosts.aoe) : 0,
-      slow: def.slow ? Math.min(def.slow * this.boosts.iceSlow, 0.9) : 0,
+      slow: def.slow ? Math.max(def.slow * this.boosts.iceSlow, 0.1) : 0,
       slowDuration: def.slowDuration || 0,
       projectileTexture: def.projectile,
       lastFired: 0,
@@ -1034,6 +1072,7 @@ export class GameScene extends Phaser.Scene {
     }).setInteractive({ useHandCursor: true })
     sellBtn.on('pointerdown', () => {
       this.gold += sellValue
+      this.showFloatingText(tower.x, tower.y - 20, `+$${sellValue}`, '#f1c40f')
       tower.sprite.destroy()
       tower.hpBg.destroy()
       tower.hpBar.destroy()
@@ -1217,10 +1256,6 @@ export class GameScene extends Phaser.Scene {
       if (dist < 5) {
         enemy.waypointIndex++
         if (enemy.waypointIndex >= this.waypoints.length) {
-          // Kamikaze: explode on nearest tower before exiting
-          if (enemy.kamikaze) {
-            this.kamikazeExplosion(enemy)
-          }
           this.lives -= enemy.damage
           this.removeEnemy(enemy)
           this.updateHUD()
@@ -1237,6 +1272,21 @@ export class GameScene extends Phaser.Scene {
         const moveY = (dy / dist) * speed
         enemy.sprite.x += moveX
         enemy.sprite.y += moveY
+
+        // Kamikaze: rocket goblins explode when passing near towers
+        if (enemy.kamikaze && !enemy._kamikazed) {
+          for (const tower of this.towers) {
+            if (tower.hp <= 0) continue
+            const tdx = enemy.sprite.x - tower.x
+            const tdy = enemy.sprite.y - tower.y
+            if (Math.sqrt(tdx * tdx + tdy * tdy) < TILE * 1.5) {
+              enemy._kamikazed = true
+              this.kamikazeExplosion(enemy)
+              this.damageEnemy(enemy, enemy.hp + 1) // Kill the rocket goblin
+              break
+            }
+          }
+        }
 
         // Flip sprite based on movement direction
         if (dx < -2) {
@@ -1324,8 +1374,10 @@ export class GameScene extends Phaser.Scene {
       let closest = null
       let closestDist = Infinity
 
+      const canTargetFlying = tower.type === 'scout' || tower.type === 'storm'
       this.enemies.forEach(enemy => {
         if (!enemy.sprite.active) return
+        if (enemy.flying && !canTargetFlying) return // Flying: only scout/storm can target
         const dx = enemy.sprite.x - tower.x
         const dy = enemy.sprite.y - tower.y
         const dist = Math.sqrt(dx * dx + dy * dy)
@@ -1421,8 +1473,13 @@ export class GameScene extends Phaser.Scene {
         dep.timer -= speedDelta
         if (dep.timer <= 0) {
           dep.active = false
+          try { dep.graphics.destroy() } catch (e) {}
           return false
         }
+        // Fade visual alpha proportional to remaining time
+        const alphaRatio = Math.max(0, dep.timer / 5000)
+        try { dep.graphics.setAlpha(0.5 * alphaRatio) } catch (e) {}
+        // Track enemies hit during the cloud's lifetime for bonus mission
         this.enemies.forEach(enemy => {
           if (!enemy.sprite.active) return
           const dx = enemy.sprite.x - dep.x
@@ -1645,6 +1702,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   damageEnemy(enemy, damage, towerType) {
+    if (enemy.hp <= 0) return // Already dead — prevent double-kill crash from splash
     enemy.hp -= damage
 
     // Damage number float (only for significant hits)
@@ -1923,7 +1981,10 @@ export class GameScene extends Phaser.Scene {
 
     // Save kill stats and personal best
     addTotalKills(this.enemiesKilled, this.gemsCollected)
-    const score = this.enemiesKilled * 100 + this.gemsCollected * 50 + (won ? stars * 500 : 0)
+    const diffMults = { casual: 0.5, normal: 1.0, brutal: 1.5, inferno: 2.0 }
+    const diffScoreMult = diffMults[this.difficulty] || 1.0
+    const livesBonus = won ? this.lives * 50 : 0
+    const score = Math.round((this.enemiesKilled * 100 + this.gemsCollected * 50 + livesBonus + (won ? stars * 500 : 0)) * diffScoreMult)
     setPersonalBest(`${this.levelIndex}_${this.difficulty}`, score, this.enemiesKilled)
 
     // Check bonus mission
@@ -2055,6 +2116,18 @@ export class GameScene extends Phaser.Scene {
     this.waveText.setText(`Wave ${Math.min(this.currentWave + 1, this.levelData.waves.length)}/${this.levelData.waves.length}`)
     this.gemText.setText(`${this.gemsCollected}`)
     this.killText.setText(`\u2620 ${this.enemiesKilled}`)
+
+    // Update build panel affordability — gray out towers player can't afford
+    if (this.buildIcons) {
+      this.buildIcons.forEach(icon => {
+        const cost = TOWER_TYPES[icon.towerKey]?.cost || 0
+        if (this.gold >= cost) {
+          icon.setAlpha(1).clearTint()
+        } else {
+          icon.setAlpha(0.4).setTint(0x666666)
+        }
+      })
+    }
   }
 
   updateGameState() {
