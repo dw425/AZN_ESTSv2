@@ -108,6 +108,20 @@ export class LevelSelectScene extends Phaser.Scene {
     // Difficulty popup container (hidden)
     this.diffPopup = null
 
+    // Endless mode button
+    const endlessBtn = this.add.text(cx, h - 28, '\u221E Endless', {
+      fontSize: '14px', color: '#ff4500', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10)
+    endlessBtn.on('pointerdown', () => {
+      // Start endless mode on a random unlocked level
+      const maxLevel = Math.min(progress, LEVELS.length)
+      const levelIdx = Math.floor(Math.random() * maxLevel)
+      this.scene.start('GameScene', { levelIndex: levelIdx, difficulty: 'normal', endless: true })
+    })
+    endlessBtn.on('pointerover', () => endlessBtn.setColor('#ff7744'))
+    endlessBtn.on('pointerout', () => endlessBtn.setColor('#ff4500'))
+
     // Shop button
     const shopBtn = this.add.text(w - 70, h - 28, 'Shop', {
       fontSize: '16px',

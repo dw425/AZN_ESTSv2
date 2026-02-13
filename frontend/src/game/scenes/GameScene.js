@@ -11,8 +11,10 @@ export class GameScene extends Phaser.Scene {
 
   init(data) {
     this.levelIndex = data.levelIndex || 0
+    this.endlessMode = data.endless || false
     this.levelData = LEVELS[this.levelIndex]
     this.difficulty = data.difficulty || 'normal'
+    this.endlessWaveNum = 0
 
     // Difficulty multipliers
     const diffScale = {
@@ -237,6 +239,21 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.centerX, this.cameras.main.centerY - 30,
       '', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }
     ).setOrigin(0.5).setDepth(40).setVisible(false)
+
+    // Show bonus mission objective at level start (fades out after 4 seconds)
+    const missionIdx = this.levelData.bonusMission
+    if (missionIdx !== undefined && BONUS_MISSIONS[missionIdx]) {
+      const mission = BONUS_MISSIONS[missionIdx]
+      const objText = this.add.text(
+        this.cameras.main.centerX, this.cameras.main.height - 130,
+        `\u2606 Bonus: ${mission.desc}`,
+        { fontSize: '11px', color: '#f1c40f', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }
+      ).setOrigin(0.5).setDepth(25)
+      this.tweens.add({
+        targets: objText, alpha: 0, delay: 4000, duration: 1000,
+        onComplete: () => objText.destroy(),
+      })
+    }
 
     // Start music
     this.startMusic()
@@ -1921,9 +1938,14 @@ export class GameScene extends Phaser.Scene {
         this.gold += this.goldWaveBonus
       }
 
-      if (this.currentWave >= this.levelData.waves.length) {
+      if (this.currentWave >= this.levelData.waves.length && !this.endlessMode) {
         this.handleGameOver(true)
       } else {
+        // Endless mode: generate next wave dynamically
+        if (this.endlessMode && this.currentWave >= this.levelData.waves.length) {
+          this.endlessWaveNum++
+          this.levelData.waves.push(this.generateEndlessWave(this.endlessWaveNum))
+        }
         // Heal all towers 20% between waves (like original APK)
         this.towers.forEach(tower => {
           if (tower.hp > 0 && tower.hp < tower.maxHp) {
@@ -2703,13 +2725,26 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Context-sensitive victory message (matching original APK)
-    const title = won ? (stars === 3 ? 'PERFECT!' : stars === 1 ? 'THAT WAS CLOSE!' : 'VICTORY!') : 'DEFEAT'
-    const titleColor = won ? (stars === 3 ? '#f1c40f' : '#2ecc71') : '#e74c3c'
+    let title, titleColor
+    if (this.endlessMode) {
+      title = 'ENDLESS OVER'
+      titleColor = '#ff4500'
+    } else {
+      title = won ? (stars === 3 ? 'PERFECT!' : stars === 1 ? 'THAT WAS CLOSE!' : 'VICTORY!') : 'DEFEAT'
+      titleColor = won ? (stars === 3 ? '#f1c40f' : '#2ecc71') : '#e74c3c'
+    }
 
     this.add.text(cx, cy - 80, title, {
       fontSize: '48px', color: titleColor, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51)
+
+    if (this.endlessMode) {
+      this.add.text(cx, cy - 45, `Survived ${this.currentWave} waves!`, {
+        fontSize: '16px', color: '#fff', fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(51)
+    }
 
     if (won) {
       this.playSfx('sfx_gold_star', 0.4)
@@ -2746,21 +2781,34 @@ export class GameScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(51)
 
+    // Bonus mission result
+    if (missionIdx !== undefined && BONUS_MISSIONS[missionIdx]) {
+      const mission = BONUS_MISSIONS[missionIdx]
+      const missionKey = `${this.levelIndex}_${this.difficulty}`
+      const wasDone = this.saveData.bonusMissions[missionKey]
+      const missionColor = wasDone ? '#2ecc71' : '#888'
+      const missionMark = wasDone ? '\u2713' : '\u2717'
+      this.add.text(cx, cy + 40, `${missionMark} Bonus: ${mission.desc}`, {
+        fontSize: '10px', color: missionColor,
+        stroke: '#000', strokeThickness: 1,
+      }).setOrigin(0.5).setDepth(51)
+    }
+
     // Score
-    this.add.text(cx, cy + 40, `Score: ${score}`, {
+    this.add.text(cx, cy + 55, `Score: ${score}`, {
       fontSize: '12px', color: '#f1c40f',
       stroke: '#000', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(51)
 
     // Buttons
-    const menuBtn = this.add.text(cx - 80, cy + 65, 'Menu', {
+    const menuBtn = this.add.text(cx - 80, cy + 80, 'Menu', {
       fontSize: '20px', color: '#fff', backgroundColor: '#16213e',
       padding: { x: 16, y: 8 },
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     menuBtn.on('pointerdown', () => this.scene.start('LevelSelectScene'))
 
     if (won && this.levelIndex + 1 < LEVELS.length) {
-      const nextBtn = this.add.text(cx + 80, cy + 65, 'Next', {
+      const nextBtn = this.add.text(cx + 80, cy + 80, 'Next', {
         fontSize: '20px', color: '#fff', backgroundColor: '#e94560',
         padding: { x: 16, y: 8 },
       }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
@@ -2769,7 +2817,7 @@ export class GameScene extends Phaser.Scene {
       })
     }
 
-    const retryBtn = this.add.text(cx, cy + 110, 'Retry', {
+    const retryBtn = this.add.text(cx, cy + 120, 'Retry', {
       fontSize: '16px', color: '#888',
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     retryBtn.on('pointerdown', () => {
@@ -2780,7 +2828,11 @@ export class GameScene extends Phaser.Scene {
   updateHUD() {
     this.goldText.setText(`${this.gold}`)
     this.livesText.setText(`${this.lives}`)
-    this.waveText.setText(`Wave ${Math.min(this.currentWave + 1, this.levelData.waves.length)}/${this.levelData.waves.length}`)
+    if (this.endlessMode) {
+      this.waveText.setText(`\u221E Wave ${this.currentWave + 1}`)
+    } else {
+      this.waveText.setText(`Wave ${Math.min(this.currentWave + 1, this.levelData.waves.length)}/${this.levelData.waves.length}`)
+    }
     this.gemText.setText(`${this.gemsCollected}`)
     this.killText.setText(`\u2620 ${this.enemiesKilled}`)
 
@@ -2797,6 +2849,42 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  generateEndlessWave(waveNum) {
+    // Generate increasingly difficult waves for endless mode
+    const enemyPool = [
+      { type: 'slime', minWave: 1 },
+      { type: 'goblin', minWave: 1 },
+      { type: 'orc', minWave: 3 },
+      { type: 'troll', minWave: 4 },
+      { type: 'gelcube', minWave: 5 },
+      { type: 'ogre', minWave: 7 },
+      { type: 'rocketgoblin', minWave: 6 },
+      { type: 'beholder', minWave: 10 },
+      { type: 'giant', minWave: 12 },
+      { type: 'dragon', minWave: 15 },
+    ]
+
+    const available = enemyPool.filter(e => waveNum >= e.minWave)
+    const groups = []
+    const numGroups = Math.min(1 + Math.floor(waveNum / 3), 4)
+
+    for (let i = 0; i < numGroups; i++) {
+      const entry = available[Math.floor(Math.random() * available.length)]
+      const count = Math.min(3 + Math.floor(waveNum * 0.8) + Math.floor(Math.random() * 3), 25)
+      groups.push({ type: entry.type, count })
+    }
+
+    // Every 10 waves, add a boss
+    const isBoss = waveNum % 10 === 0
+    if (isBoss) {
+      const bosses = ['boss_beholder', 'boss_ogre', 'boss_dragon']
+      const bossType = bosses[Math.min(Math.floor(waveNum / 10) - 1, bosses.length - 1)]
+      groups.push({ type: bossType, count: 1 })
+    }
+
+    return { enemies: groups, boss: isBoss }
+  }
+
   updateWavePreview() {
     if (!this.wavePreview) return
     const waveIdx = this.currentWave
@@ -2807,9 +2895,16 @@ export class GameScene extends Phaser.Scene {
     const wave = this.levelData.waves[waveIdx]
     const parts = wave.enemies.map(g => {
       const def = ENEMY_TYPES[g.type]
-      return `${g.count}x ${def ? def.name : g.type}`
+      if (!def) return `${g.count}x ${g.type}`
+      let info = `${g.count}x ${def.name}`
+      // Show resistance indicators
+      if (def.physResist > 0) info += ' \u{1F6E1}' // shield = physical resist
+      if (def.magResist > 0) info += ' \u2728' // sparkle = magic resist
+      if (def.flying) info += ' \u2708' // airplane = flying
+      if (def.boss) info += ' \u{1F451}' // crown = boss
+      return info
     })
-    const preview = `Next: ${parts.join(', ')}${wave.boss ? ' [BOSS]' : ''}`
+    const preview = `Next: ${parts.join(', ')}${wave.boss ? ' \u26A0 BOSS WAVE' : ''}`
     this.wavePreview.setText(preview).setVisible(true)
   }
 
