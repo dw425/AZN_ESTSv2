@@ -124,16 +124,23 @@ export class GameScene extends Phaser.Scene {
 
   drawMap() {
     const grid = this.levelData.grid
+    const bgKey = this.levelData.mapBg || 'tile_grass'
+    const pathKey = this.textures.exists('map_path') ? 'map_path' : 'tile_path'
+
+    // Draw full background
+    if (this.textures.exists(bgKey)) {
+      this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, bgKey)
+        .setDisplaySize(this.cameras.main.width, this.cameras.main.height)
+    }
+
     for (let r = 0; r < grid.length; r++) {
       for (let c = 0; c < grid[r].length; c++) {
         const x = c * TILE + TILE / 2
         const y = r * TILE + TILE / 2
         const val = grid[r][c]
 
-        if (val === 0) {
-          this.add.image(x, y, 'tile_grass').setDisplaySize(TILE, TILE)
-        } else {
-          this.add.image(x, y, 'tile_path').setDisplaySize(TILE, TILE)
+        if (val >= 1) {
+          this.add.image(x, y, 'tile_path').setDisplaySize(TILE, TILE).setAlpha(0.6)
         }
 
         // Mark spawn
@@ -196,19 +203,21 @@ export class GameScene extends Phaser.Scene {
     panelBg.fillRect(0, panelY - 10, this.cameras.main.width, 80)
 
     const types = Object.entries(TOWER_TYPES)
-    const startX = 60
+    const totalWidth = types.length * 85
+    const startX = (this.cameras.main.width - totalWidth) / 2 + 42
 
     types.forEach(([key, tower], i) => {
-      const x = startX + i * 120
+      const x = startX + i * 85
       const y = panelY + 15
 
-      const icon = this.add.image(x, y, tower.texture)
-        .setDisplaySize(36, 36)
+      const iconKey = tower.hudIcon || tower.texture
+      const icon = this.add.image(x, y, iconKey)
+        .setDisplaySize(40, 40)
         .setInteractive({ useHandCursor: true })
         .setDepth(16)
 
       const label = this.add.text(x, y + 28, `${tower.name}\n$${tower.cost}`, {
-        fontSize: '10px', color: '#ccc', align: 'center',
+        fontSize: '9px', color: '#ccc', align: 'center',
       }).setOrigin(0.5, 0).setDepth(16)
 
       // Selection highlight
@@ -349,6 +358,14 @@ export class GameScene extends Phaser.Scene {
           if (upgrade.splash) tower.splash = upgrade.splash
           if (upgrade.slow) tower.slow = upgrade.slow
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
+          // Swap tower sprite to upgraded version
+          const towerDef = TOWER_TYPES[tower.type]
+          if (towerDef.textures && towerDef.textures[tower.level]) {
+            const newTex = towerDef.textures[tower.level]
+            if (this.textures.exists(newTex)) {
+              tower.sprite.setTexture(newTex)
+            }
+          }
           this.updateHUD()
           menu.destroy()
           this.rangeIndicator.setVisible(false)
