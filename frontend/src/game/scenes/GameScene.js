@@ -823,6 +823,7 @@ export class GameScene extends Phaser.Scene {
           } else {
             this.activeWeapon = wpn.key
             this.selectedTowerType = null
+            this._weaponJustSelected = true // Prevent immediate deploy
             this.updateBuildHighlights()
           }
           this.updateWeaponHighlights()
@@ -1031,8 +1032,12 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver || this.paused) return
     if (pointer.y < 36 || pointer.y > this.cameras.main.height - 80) return
 
-    // Deploy weapon if active
+    // Deploy weapon if active — but don't deploy on the same frame weapon was selected
     if (this.activeWeapon) {
+      if (this._weaponJustSelected) {
+        this._weaponJustSelected = false
+        return
+      }
       this.deployWeapon(pointer.x, pointer.y)
       return
     }
