@@ -122,6 +122,7 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   drawPage() {
+    if (this.diffPopup) { this.diffPopup.destroy(); this.diffPopup = null }
     if (this.pageContainer) this.pageContainer.destroy()
     this.pageContainer = this.add.container(0, 0).setDepth(5)
 

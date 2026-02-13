@@ -449,7 +449,7 @@ export class GameScene extends Phaser.Scene {
       this.pauseBtn = this.add.image(speedX + 56, 18, 'hud_pause')
         .setDisplaySize(22, 22).setDepth(16)
         .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.togglePause())
+        .on('pointerdown', () => this.showPauseMenu())
     }
 
     // Menu button
@@ -501,10 +501,12 @@ export class GameScene extends Phaser.Scene {
     const cy = this.cameras.main.centerY
     const container = this.add.container(cx, cy).setDepth(60)
 
-    // Backdrop
+    // Backdrop — click outside panel to resume
     const backdrop = this.add.graphics()
     backdrop.fillStyle(0x000000, 0.7)
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
+    backdrop.setInteractive(new Phaser.Geom.Rectangle(-cx, -cy, cx * 2, cy * 2), Phaser.Geom.Rectangle.Contains)
+    backdrop.on('pointerdown', () => { container.destroy(); this.pauseMenu = null; this.paused = false })
     container.add(backdrop)
 
     // Panel
@@ -542,9 +544,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   stopMusic() {
-    if (this.bgMusic && this.bgMusic.isPlaying) {
-      this.bgMusic.stop()
-    }
+    try { this.sound.stopAll() } catch (e) {}
   }
 
   playSfx(key, volume) {
@@ -714,9 +714,9 @@ export class GameScene extends Phaser.Scene {
       const radius = 80
       const damage = 150
 
-      const boom = this.add.graphics().setDepth(11)
+      const boom = this.add.graphics().setDepth(11).setPosition(x, y)
       boom.fillStyle(0xe74c3c, 0.6)
-      boom.fillCircle(x, y, radius)
+      boom.fillCircle(0, 0, radius)
       this.tweens.add({
         targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 500,
         onComplete: () => boom.destroy(),
@@ -853,7 +853,7 @@ export class GameScene extends Phaser.Scene {
       sprite, type, gridCol: col, gridRow: row, x, y,
       damage: Math.round(def.damage * this.boosts.damage),
       range: Math.round(def.range * this.boosts.range),
-      fireRate: Math.round(def.fireRate * this.boosts.fireRate),
+      fireRate: Math.max(200, Math.round(def.fireRate * this.boosts.fireRate)),
       splash: def.splash ? Math.round(def.splash * this.boosts.aoe) : 0,
       slow: def.slow ? Math.min(def.slow * this.boosts.iceSlow, 0.9) : 0,
       slowDuration: def.slowDuration || 0,
@@ -865,6 +865,7 @@ export class GameScene extends Phaser.Scene {
       hpBg,
       hpBar,
       autoHealRate: (this.saveData.upgrades.towerAutoHealBoost || 0) * 0.5,
+      totalInvestment: def.cost,
     }
 
     this.towers.push(tower)
@@ -979,6 +980,7 @@ export class GameScene extends Phaser.Scene {
       upgradeBtn.on('pointerdown', () => {
         if (this.gold >= upgrade.cost) {
           this.gold -= upgrade.cost
+          tower.totalInvestment += upgrade.cost
           tower.level++
           tower.damage = Math.round(upgrade.damage * this.boosts.damage)
           tower.range = Math.round((upgrade.range || tower.range) * this.boosts.range)
@@ -1026,7 +1028,7 @@ export class GameScene extends Phaser.Scene {
       yOffset += 18
     }
 
-    const sellValue = Math.floor(def.cost * 0.6)
+    const sellValue = Math.floor(tower.totalInvestment * 0.6)
     if (this.textures.exists('hud_sell')) {
       menu.add(this.add.image(25, yOffset - 11, 'hud_sell').setDisplaySize(14, 14))
     }
@@ -1052,6 +1054,7 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(5000, () => {
       if (menu && menu.active) {
         menu.destroy()
+        this.towerMenu = null
         this.rangeIndicator.setVisible(false)
       }
     })
@@ -1280,10 +1283,9 @@ export class GameScene extends Phaser.Scene {
           if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
 
-        // Standard melee range (ogre, giant have melee flag for extra damage)
-        if (dist < TILE * 1.2) {
-          const meleeMult = enemy.melee ? 10 : 5
-          const dps = enemy.damage * meleeMult
+        // Melee enemies damage towers they pass near
+        if (enemy.melee && dist < TILE * 1.2) {
+          const dps = enemy.damage * 10
           tower.hp -= (dps * speedDelta) / 1000
           if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
@@ -1320,7 +1322,7 @@ export class GameScene extends Phaser.Scene {
     // Tower firing
     this.towers.forEach(tower => {
       if (tower.hp <= 0) return
-      if (time - tower.lastFired < tower.fireRate) return
+      if (time - tower.lastFired < tower.fireRate / this.gameSpeed) return
 
       let closest = null
       let closestDist = Infinity
@@ -1610,9 +1612,9 @@ export class GameScene extends Phaser.Scene {
   handleProjectileHit(proj) {
     // Impact visual
     const impactColor = proj.slow > 0 ? 0x00bcd4 : proj.splash > 0 ? 0xe74c3c : 0xf1c40f
-    const impact = this.add.graphics().setDepth(11)
+    const impact = this.add.graphics().setDepth(11).setPosition(proj.targetX, proj.targetY)
     impact.fillStyle(impactColor, 0.6)
-    impact.fillCircle(proj.targetX, proj.targetY, proj.splash > 0 ? proj.splash / 3 : 8)
+    impact.fillCircle(0, 0, proj.splash > 0 ? proj.splash / 3 : 8)
     this.tweens.add({
       targets: impact, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 200,
       onComplete: () => impact.destroy(),
@@ -1626,17 +1628,22 @@ export class GameScene extends Phaser.Scene {
         const dy = enemy.sprite.y - proj.targetY
         if (Math.sqrt(dx * dx + dy * dy) <= proj.splash) {
           this.damageEnemy(enemy, proj.damage, proj.towerType)
+          // Apply slow to all enemies in splash radius (ice tower AoE slow)
+          if (proj.slow > 0) {
+            enemy.speed = enemy.baseSpeed * proj.slow
+            enemy.slowTimer = proj.slowDuration
+            enemy.sprite.setTint(0x00bcd4)
+          }
         }
       })
     } else if (proj.target && proj.target.sprite.active) {
       this.damageEnemy(proj.target, proj.damage, proj.towerType)
-    }
-
-    // Slow effect
-    if (proj.slow > 0 && proj.target && proj.target.sprite.active) {
-      proj.target.speed = proj.target.baseSpeed * proj.slow
-      proj.target.slowTimer = proj.slowDuration
-      proj.target.sprite.setTint(0x00bcd4)
+      // Slow effect on single target
+      if (proj.slow > 0) {
+        proj.target.speed = proj.target.baseSpeed * proj.slow
+        proj.target.slowTimer = proj.slowDuration
+        proj.target.sprite.setTint(0x00bcd4)
+      }
     }
   }
 
@@ -1773,9 +1780,9 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Explosion visual
-      const boom = this.add.graphics().setDepth(11)
+      const boom = this.add.graphics().setDepth(11).setPosition(nearest.x, nearest.y)
       boom.fillStyle(0xff6600, 0.6)
-      boom.fillCircle(nearest.x, nearest.y, 40)
+      boom.fillCircle(0, 0, 40)
       this.tweens.add({
         targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400,
         onComplete: () => boom.destroy(),
@@ -1836,7 +1843,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   collectGem(gemDrop) {
-    if (!gemDrop.graphics.active) return
+    if (!gemDrop.graphics.active || gemDrop.collected) return
+    gemDrop.collected = true
     this.gemsCollected += gemDrop.value
     this.playSfx(gemDrop.value >= 3 ? 'sfx_chime2' : 'sfx_chime1', 0.3)
 
@@ -2047,7 +2055,7 @@ export class GameScene extends Phaser.Scene {
   updateHUD() {
     this.goldText.setText(`${this.gold}`)
     this.livesText.setText(`${this.lives}`)
-    this.waveText.setText(`Wave ${this.currentWave + 1}/${this.levelData.waves.length}`)
+    this.waveText.setText(`Wave ${Math.min(this.currentWave + 1, this.levelData.waves.length)}/${this.levelData.waves.length}`)
     this.gemText.setText(`${this.gemsCollected}`)
     this.killText.setText(`\u2620 ${this.enemiesKilled}`)
   }
