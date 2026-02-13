@@ -81,6 +81,11 @@ export class GameScene extends Phaser.Scene {
     this.gasMultiHits = 0
     this.maxCatapultLevel = 0
 
+    // Combo system — rapid kills give bonus gold
+    this.comboCount = 0
+    this.comboTimer = 0
+    this.comboGoldBonus = 0
+
     // Parse special tiles (runes, gold deposits, treasure chests)
     this.specialTiles = { runes: [], deposits: [], chests: [] }
     const grid = this.levelData.grid
@@ -468,24 +473,34 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(4)
     })
 
-    // Render treasure chests — inline graphics only (no generated textures)
+    // Render treasure chests as destructible targets with HP
     this.specialTiles.chests.forEach(chest => {
       const cx = chest.c * TILE + TILE / 2
       const cy = chest.r * TILE + TILE / 2
-      chest.sprite = this.add.graphics().setDepth(3)
+      chest.x = cx
+      chest.y = cy
+      chest.hp = 150
+      chest.maxHp = 150
+      chest.reward = 75
+      chest.isChest = true
+      // Use positioned graphics so sprite.x/y work for targeting
+      chest.sprite = this.add.graphics().setDepth(3).setPosition(cx, cy)
       // Brown chest body
       chest.sprite.fillStyle(0x8b4513, 0.85)
-      chest.sprite.fillRoundedRect(cx - 12, cy - 8, 24, 16, 3)
+      chest.sprite.fillRoundedRect(-12, -8, 24, 16, 3)
       // Gold clasp
       chest.sprite.fillStyle(0xf1c40f, 0.9)
-      chest.sprite.fillRect(cx - 3, cy - 4, 6, 6)
+      chest.sprite.fillRect(-3, -4, 6, 6)
       // Lid highlight
       chest.sprite.lineStyle(1, 0xa0522d)
-      chest.sprite.strokeRoundedRect(cx - 12, cy - 8, 24, 16, 3)
+      chest.sprite.strokeRoundedRect(-12, -8, 24, 16, 3)
       this.add.text(cx, cy + 14, '\u2666', {
         fontSize: '8px', color: '#f1c40f',
         stroke: '#000', strokeThickness: 1,
       }).setOrigin(0.5).setDepth(4)
+      // HP bar for chest (hidden until damaged)
+      chest.hpBg = this.add.graphics().setDepth(4).setVisible(false)
+      chest.hpBar = this.add.graphics().setDepth(4).setVisible(false)
     })
   }
 
@@ -940,11 +955,18 @@ export class GameScene extends Phaser.Scene {
       return
     }
 
-    // Manual targeting — click on enemy to focus tower fire (like original APK)
+    // Manual targeting — click on enemy or chest to focus tower fire (like original APK)
     if (!this.selectedTowerType) {
-      const clickedEnemy = this.findEnemyAt(pointer.x, pointer.y)
-      if (clickedEnemy) {
-        this.setManualTarget(clickedEnemy)
+      const clickedTarget = this.findEnemyAt(pointer.x, pointer.y)
+      if (clickedTarget) {
+        this.setManualTarget(clickedTarget)
+        return
+      }
+    } else {
+      // Even when placing towers, allow clicking chests to target them
+      const clickedChest = this.findChestAt(pointer.x, pointer.y)
+      if (clickedChest) {
+        this.setManualTarget(clickedChest)
         return
       }
     }
@@ -998,24 +1020,59 @@ export class GameScene extends Phaser.Scene {
         nearDist = dist
       }
     })
+    // Also check treasure chests as clickable targets
+    this.specialTiles.chests.forEach(chest => {
+      if (chest.opened || !chest.sprite.active) return
+      const dx = chest.x - x
+      const dy = chest.y - y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < nearDist) {
+        nearest = chest
+        nearDist = dist
+      }
+    })
     return nearest
   }
 
-  setManualTarget(enemy) {
-    this.manualTarget = enemy
+  findChestAt(x, y) {
+    let nearest = null
+    let nearDist = 30
+    this.specialTiles.chests.forEach(chest => {
+      if (chest.opened || !chest.sprite.active) return
+      const dx = chest.x - x
+      const dy = chest.y - y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < nearDist) {
+        nearest = chest
+        nearDist = dist
+      }
+    })
+    return nearest
+  }
+
+  setManualTarget(target) {
+    this.manualTarget = target
+    const tx = target.isChest ? target.x : target.sprite.x
+    const ty = target.isChest ? target.y : target.sprite.y
     // Show target indicator
     if (this.targetIndicator) this.targetIndicator.destroy()
     if (this.textures.exists('hud_target_arrow')) {
-      this.targetIndicator = this.add.image(enemy.sprite.x, enemy.sprite.y - 25, 'hud_target_arrow')
+      this.targetIndicator = this.add.image(tx, ty - 25, 'hud_target_arrow')
         .setDisplaySize(16, 16).setDepth(15)
     } else {
-      this.targetIndicator = this.add.text(enemy.sprite.x, enemy.sprite.y - 25, '\u25BC', {
-        fontSize: '16px', color: '#e94560', fontStyle: 'bold',
+      this.targetIndicator = this.add.text(tx, ty - 25, '\u25BC', {
+        fontSize: '16px', color: target.isChest ? '#f1c40f' : '#e94560', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(0.5).setDepth(15)
     }
-    this.showFloatingText(enemy.sprite.x, enemy.sprite.y - 30, 'TARGET!', '#e94560')
-    this.showTutorial('Tut_ManualTarget')
+    const label = target.isChest ? 'DESTROY!' : 'TARGET!'
+    const color = target.isChest ? '#f1c40f' : '#e94560'
+    this.showFloatingText(tx, ty - 30, label, color)
+    if (target.isChest) {
+      this.showTutorial('Tut_Chests')
+    } else {
+      this.showTutorial('Tut_ManualTarget')
+    }
   }
 
   clearManualTarget() {
@@ -1120,19 +1177,7 @@ export class GameScene extends Phaser.Scene {
       }
     })
 
-    // Check treasure chests (adjacent = open for gold)
-    this.specialTiles.chests.forEach(chest => {
-      if (chest.opened) return
-      if (Math.abs(chest.c - col) <= 1 && Math.abs(chest.r - row) <= 1) {
-        chest.opened = true
-        const goldBonus = 75
-        this.gold += goldBonus
-        this.showFloatingText(chest.c * TILE + TILE / 2, chest.r * TILE + TILE / 2, `+${goldBonus} gold!`, '#f1c40f')
-        if (chest.sprite) { try { chest.sprite.destroy() } catch (e) {} }
-        this.playSfx('sfx_coin_explosion')
-        this.showTutorial('Tut_Chests')
-      }
-    })
+    // Treasure chests are now destructible targets — click to target, towers shoot to open
 
     this.updateHUD()
     this.playSfx('sfx_tower_placed')
@@ -1442,6 +1487,14 @@ export class GameScene extends Phaser.Scene {
 
     const speedDelta = delta * this.gameSpeed
 
+    // Combo timer decay
+    if (this.comboTimer > 0) {
+      this.comboTimer -= speedDelta
+      if (this.comboTimer <= 0) {
+        this.comboCount = 0
+      }
+    }
+
     // Move enemies
     this.enemies.forEach(enemy => {
       if (!enemy.sprite.active) return
@@ -1534,10 +1587,14 @@ export class GameScene extends Phaser.Scene {
 
     // Update manual target indicator position
     if (this.manualTarget) {
-      if (!this.manualTarget.sprite.active || this.manualTarget.hp <= 0) {
+      const mt = this.manualTarget
+      const dead = mt.isChest ? mt.opened : (!mt.sprite.active || mt.hp <= 0)
+      if (dead) {
         this.clearManualTarget()
       } else if (this.targetIndicator) {
-        this.targetIndicator.setPosition(this.manualTarget.sprite.x, this.manualTarget.sprite.y - 25)
+        const tx = mt.isChest ? mt.x : mt.sprite.x
+        const ty = mt.isChest ? mt.y : mt.sprite.y
+        this.targetIndicator.setPosition(tx, ty - 25)
       }
     }
 
@@ -1617,17 +1674,22 @@ export class GameScene extends Phaser.Scene {
       if (tower.hp <= 0) return
       if (time - tower.lastFired < tower.fireRate / this.gameSpeed) return
 
-      // Manual target override — if player has clicked an enemy, prioritize it
+      // Manual target override — if player has clicked an enemy or chest, prioritize it
       let bestTarget = null
       const canTargetFlying = tower.type === 'scout' || tower.type === 'storm'
 
-      if (this.manualTarget && this.manualTarget.sprite.active) {
+      if (this.manualTarget) {
         const mt = this.manualTarget
-        if (!mt.flying || canTargetFlying) {
-          const dx = mt.sprite.x - tower.x
-          const dy = mt.sprite.y - tower.y
-          if (Math.sqrt(dx * dx + dy * dy) <= tower.range) {
-            bestTarget = mt
+        const mtActive = mt.isChest ? !mt.opened : mt.sprite.active
+        if (mtActive) {
+          if (mt.isChest || !mt.flying || canTargetFlying) {
+            const mtx = mt.isChest ? mt.x : mt.sprite.x
+            const mty = mt.isChest ? mt.y : mt.sprite.y
+            const dx = mtx - tower.x
+            const dy = mty - tower.y
+            if (Math.sqrt(dx * dx + dy * dy) <= tower.range) {
+              bestTarget = mt
+            }
           }
         }
       }
@@ -1719,9 +1781,13 @@ export class GameScene extends Phaser.Scene {
         proj.sprite.setRotation(Math.atan2(dy, dx))
       }
 
-      if (proj.target && proj.target.sprite.active) {
-        proj.targetX = proj.target.sprite.x
-        proj.targetY = proj.target.sprite.y
+      if (proj.target) {
+        if (proj.target.isChest) {
+          // Chest targets are static — no position update needed
+        } else if (proj.target.sprite.active) {
+          proj.targetX = proj.target.sprite.x
+          proj.targetY = proj.target.sprite.y
+        }
       }
 
       return true
@@ -1899,16 +1965,18 @@ export class GameScene extends Phaser.Scene {
 
     // Calculate arc parameters for catapult/cannon projectiles
     const startX = tower.x, startY = tower.y
-    const dx = enemy.sprite.x - startX
-    const dy = enemy.sprite.y - startY
+    const targetX = enemy.isChest ? enemy.x : enemy.sprite.x
+    const targetY = enemy.isChest ? enemy.y : enemy.sprite.y
+    const dx = targetX - startX
+    const dy = targetY - startY
     const totalDist = Math.sqrt(dx * dx + dy * dy)
     const useArc = tower.type === 'catapult' || tower.type === 'cannon'
 
     this.projectiles.push({
       sprite,
       target: enemy,
-      targetX: enemy.sprite.x,
-      targetY: enemy.sprite.y,
+      targetX: targetX,
+      targetY: targetY,
       damage: overrideDamage || tower.damage,
       splash: tower.splash,
       slow: tower.slow,
@@ -1934,6 +2002,16 @@ export class GameScene extends Phaser.Scene {
       try { tower.sprite.play(stormAnimKey) } catch (e) {}
     }
     this.playSfx('sfx_lightning', 0.25)
+
+    // Handle chest target — direct hit only, no chain
+    if (primary.isChest) {
+      this.damageChest(primary, tower.damage)
+      const bolt = this.add.graphics().setDepth(11)
+      bolt.lineStyle(2, 0x9b59b6, 0.8)
+      bolt.lineBetween(tower.x, tower.y, primary.x, primary.y)
+      this.tweens.add({ targets: bolt, alpha: 0, duration: 200, onComplete: () => bolt.destroy() })
+      return
+    }
 
     this.damageEnemy(primary, tower.damage, tower.type)
 
@@ -1992,6 +2070,12 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => impact.destroy(),
     })
 
+    // Check if hitting a treasure chest
+    if (proj.target && proj.target.isChest) {
+      this.damageChest(proj.target, proj.damage)
+      return
+    }
+
     if (proj.splash > 0) {
       this.playSfx('sfx_catapult_impact', 0.2)
       this.enemies.forEach(enemy => {
@@ -2036,7 +2120,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (enemy.hp <= 0) {
-      this.gold += enemy.reward
+      // Combo system — rapid kills build combo multiplier for bonus gold
+      this.comboCount++
+      this.comboTimer = 2000 // Reset combo window (2 seconds)
+      const comboMult = Math.min(this.comboCount, 10) // Cap at 10x
+      const comboBonus = comboMult >= 3 ? Math.round(enemy.reward * (comboMult - 2) * 0.5) : 0
+      this.comboGoldBonus += comboBonus
+
+      this.gold += enemy.reward + comboBonus
       this.enemiesKilled++
       if (enemy.boss) this.bossKilled = true
       if (towerType === 'scout') {
@@ -2044,6 +2135,11 @@ export class GameScene extends Phaser.Scene {
         if (enemy.type === 'ogre' || enemy.type === 'boss_ogre') this.scoutKilledOgre = true
       }
       this.dropGem(enemy.sprite.x, enemy.sprite.y, enemy.reward)
+
+      // Show combo indicator for 3+ kills
+      if (comboMult >= 3) {
+        this.showFloatingText(enemy.sprite.x, enemy.sprite.y - 25, `${comboMult}x COMBO!`, '#f1c40f')
+      }
 
       // Death effect
       this.spawnDeathEffect(enemy)
@@ -2060,6 +2156,66 @@ export class GameScene extends Phaser.Scene {
       if (enemy.towerDamage > 0) this.showTutorial('Tut_GelCubes')
 
       this.removeEnemy(enemy)
+      this.updateHUD()
+    }
+  }
+
+  damageChest(chest, damage) {
+    if (chest.opened) return
+    chest.hp -= damage
+
+    // Show damage number
+    if (damage >= 5) {
+      const dmgText = this.add.text(chest.x + Phaser.Math.Between(-8, 8), chest.y - 15, Math.round(damage), {
+        fontSize: '10px', color: '#fff',
+        stroke: '#000', strokeThickness: 1,
+      }).setOrigin(0.5).setDepth(15)
+      this.tweens.add({
+        targets: dmgText, y: dmgText.y - 20, alpha: 0, duration: 500,
+        onComplete: () => dmgText.destroy(),
+      })
+    }
+
+    // Update chest HP bar
+    if (chest.hp > 0) {
+      chest.hpBg.setVisible(true)
+      chest.hpBar.setVisible(true)
+      const halfBar = 14
+      chest.hpBg.clear()
+      chest.hpBg.fillStyle(0x333333)
+      chest.hpBg.fillRect(chest.x - halfBar, chest.y - 18, halfBar * 2, 3)
+      chest.hpBar.clear()
+      const hpRatio = chest.hp / chest.maxHp
+      chest.hpBar.fillStyle(0xf1c40f)
+      chest.hpBar.fillRect(chest.x - halfBar, chest.y - 18, halfBar * 2 * hpRatio, 3)
+    }
+
+    if (chest.hp <= 0) {
+      chest.opened = true
+      this.gold += chest.reward
+      this.showFloatingText(chest.x, chest.y, `+${chest.reward} gold!`, '#f1c40f')
+      this.playSfx('sfx_coin_explosion')
+      // Destroy chest visuals
+      if (chest.sprite) { try { chest.sprite.destroy() } catch (e) {} }
+      if (chest.hpBg) { try { chest.hpBg.destroy() } catch (e) {} }
+      if (chest.hpBar) { try { chest.hpBar.destroy() } catch (e) {} }
+      // Gold burst particles
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2
+        const coin = this.add.graphics().setDepth(12)
+        coin.fillStyle(0xf1c40f, 0.9)
+        coin.fillCircle(0, 0, 3)
+        coin.setPosition(chest.x, chest.y)
+        this.tweens.add({
+          targets: coin,
+          x: chest.x + Math.cos(angle) * 25,
+          y: chest.y + Math.sin(angle) * 25,
+          alpha: 0, duration: 400,
+          onComplete: () => coin.destroy(),
+        })
+      }
+      // Clear manual target if it was this chest
+      if (this.manualTarget === chest) this.clearManualTarget()
       this.updateHUD()
     }
   }
@@ -2319,7 +2475,7 @@ export class GameScene extends Phaser.Scene {
     const diffScoreMult = diffMults[this.difficulty] || 1.0
     const livesBonus = won ? this.lives * 50 : 0
     const goldBonus = won ? Math.round(this.gold * 0.5) : 0
-    const score = Math.round((this.enemiesKilled * 100 + this.gemsCollected * 50 + livesBonus + goldBonus + (won ? stars * 500 : 0)) * diffScoreMult)
+    const score = Math.round((this.enemiesKilled * 100 + this.gemsCollected * 50 + livesBonus + goldBonus + this.comboGoldBonus + (won ? stars * 500 : 0)) * diffScoreMult)
     setPersonalBest(`${this.levelIndex}_${this.difficulty}`, score, this.enemiesKilled)
 
     // Check bonus mission

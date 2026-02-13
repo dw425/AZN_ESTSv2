@@ -266,24 +266,25 @@ export const BONUS_MISSIONS = [
 ]
 
 // Defeat quotes shown on game over screen (from original game)
+// Defeat quotes — matching original APK in-universe characters
 export const DEFEAT_QUOTES = [
-  '"Victory belongs to the most persevering." - Napoleon Bonaparte',
-  '"The more you sweat in training, the less you bleed in combat." - Richard Marcinko',
-  'Pro Tip: Gas Cloud + Powder Keg combo is devastatingly effective!',
-  'Pro Tip: Don\'t hoard gold. Spend it on towers and upgrades!',
+  '"You cannot always expect to win, but you can always fight." - A Great General',
+  '"He who retreats today fights again tomorrow." - An Intellectual',
+  '"True mastery is achieved through defeat." - The Iron Queen',
+  '"Every loss teaches what victory cannot." - The Old Sage',
+  '"Brains over brawn, but brawn helps too." - Gronk the Brutilator',
+  '"The trolls shall not prevail! Try again, warrior!" - The King',
   '"Old Troll Proverb: Revenge is a dish best served cold."',
-  'Pro Tip: Try Casual Mode to learn the maps first.',
-  '"Fall seven times, stand up eight." - Japanese Proverb',
+  '"A wise commander learns from every battle." - A Great General',
   'Pro Tip: Ice towers are essential for slowing bosses.',
-  '"In the middle of difficulty lies opportunity." - Albert Einstein',
   'Pro Tip: Scout towers do more damage with each consecutive hit!',
-  '"Courage is not the absence of fear, but the triumph over it." - Nelson Mandela',
   'Pro Tip: Catapults are great against swarms. Place them where paths bunch up.',
-  '"A smooth sea never made a skilled sailor." - Franklin D. Roosevelt',
   'Pro Tip: Storm towers chain lightning through groups. Position them wisely!',
-  '"Strength does not come from winning." - Vince Lombardi',
+  'Pro Tip: Gas Cloud + Powder Keg combo is devastatingly effective!',
   'Pro Tip: Sell underperforming towers to fund better ones.',
-  '"The only way to do great work is to love what you do." - Steve Jobs',
+  'Pro Tip: Try Casual Mode to learn the maps first.',
+  'Pro Tip: Runes DOUBLE the tower stat — position towers on them!',
+  'Pro Tip: Click on enemies to manually target them with all your towers.',
 ]
 
 // Tutorial messages triggered contextually
@@ -303,9 +304,10 @@ export const TUTORIALS = {
   Tut_GelCubes: { title: 'Jelly Cube!', msg: 'Gel Cubes damage your towers as they slide past. Watch your tower HP!' },
   Tut_BaseDamaged: { title: 'Base Hit!', msg: 'An enemy reached your base! Build more towers to stop them.' },
   Tut_ScoutTower: { title: 'Scout Tower', msg: 'Each consecutive shot on the same target does +25% more damage!' },
-  Tut_MineGoldDeposit: { title: 'Gold Deposit!', msg: 'Build a tower next to the gold deposit to mine it for bonus gold.' },
-  Tut_Chests: { title: 'Treasure!', msg: 'Build a tower next to a chest to open it and claim bonus gold.' },
-  Tut_Runes: { title: 'Magic Rune!', msg: 'Runes boost nearby towers. Build towers within range of runes for bonus effects!' },
+  Tut_MineGoldDeposit: { title: 'Gold Mine!', msg: 'Build a tower next to gold deposits to start mining. Gold nuggets appear periodically!' },
+  Tut_Chests: { title: 'Treasure Chest!', msg: 'Tap a chest to target it — your towers will shoot it open! Destroy it to claim gold!' },
+  Tut_Runes: { title: 'Magic Rune!', msg: 'Runes DOUBLE the stat of nearby towers. Place towers on or near runes!' },
+  Tut_ManualTarget: { title: 'Manual Target', msg: 'Tap an enemy to focus all towers on it. Tap empty ground to clear.' },
 }
 
 // grid: 15 columns x 10 rows (960/64=15, 640/64=10)
