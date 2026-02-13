@@ -1404,6 +1404,7 @@ export class GameScene extends Phaser.Scene {
           this.playSfx('sfx_tower_upgrade')
           this.showTutorial('Tut_UpgradeTower')
           menu.destroy()
+          this.towerMenu = null
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1427,6 +1428,7 @@ export class GameScene extends Phaser.Scene {
           this.playSfx('sfx_tower_upgrade')
           this.showTutorial('Tut_Repair')
           menu.destroy()
+          this.towerMenu = null
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1471,6 +1473,7 @@ export class GameScene extends Phaser.Scene {
       this.updateHUD()
       this.playSfx('sfx_tower_sell')
       menu.destroy()
+      this.towerMenu = null
       this.rangeIndicator.setVisible(false)
     })
     menu.add(sellBtn)
@@ -1541,15 +1544,23 @@ export class GameScene extends Phaser.Scene {
       const groupDelay = groupIdx * 2000
 
       this.time.delayedCall(groupDelay, () => {
-        this.time.addEvent({
-          delay: group.interval,
-          repeat: group.count - 1,
-          callback: () => {
-            if (this.gameOver) return
-            this.spawnEnemy(enemyDef, group.type)
-            this.waveSpawnCount++
-          },
-        })
+        // Spawn first enemy immediately
+        if (!this.gameOver) {
+          this.spawnEnemy(enemyDef, group.type)
+          this.waveSpawnCount++
+        }
+        // Spawn remaining enemies at intervals
+        if (group.count > 1) {
+          this.time.addEvent({
+            delay: group.interval,
+            repeat: group.count - 2,
+            callback: () => {
+              if (this.gameOver) return
+              this.spawnEnemy(enemyDef, group.type)
+              this.waveSpawnCount++
+            },
+          })
+        }
       })
     })
 
