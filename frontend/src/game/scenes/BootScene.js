@@ -114,12 +114,15 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('music_glacier', 'music/One Sly Move(Glacier).mp3')
     this.load.audio('music_gauntlet', 'music/Rocket(Gauntlet).mp3')
 
-    // Generate fallback textures for anything that might be missing
+  }
+
+  create() {
+    // Generate fallback textures AFTER preload completes (WebGL needs this in create, not preload)
     this.generateFallbacks()
+    this.scene.start('MenuScene')
   }
 
   generateFallbacks() {
-    // Simple colored circle fallback for projectiles that might not load
     const proj = this.make.graphics({ add: false })
     proj.fillStyle(0xf1c40f)
     proj.fillCircle(4, 4, 4)
@@ -148,21 +151,5 @@ export class BootScene extends Phaser.Scene {
     btn.fillStyle(0xe94560)
     btn.fillRoundedRect(0, 0, 200, 50, 10)
     btn.generateTexture('button', 200, 50)
-
-    // Path tile fallback
-    const path = this.make.graphics({ add: false })
-    path.fillStyle(0x8b7355)
-    path.fillRect(0, 0, 64, 64)
-    path.generateTexture('tile_path', 64, 64)
-
-    // Grass tile fallback
-    const grass = this.make.graphics({ add: false })
-    grass.fillStyle(0x2d5a27)
-    grass.fillRect(0, 0, 64, 64)
-    grass.generateTexture('tile_grass', 64, 64)
-  }
-
-  create() {
-    this.scene.start('MenuScene')
   }
 }
