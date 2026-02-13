@@ -937,7 +937,11 @@ export class GameScene extends Phaser.Scene {
     const x = col * TILE + TILE / 2
     const y = row * TILE + TILE / 2
 
-    const sprite = this.add.sprite(x, y, def.texture).setDisplaySize(54, 54).setDepth(4)
+    const sprite = this.add.sprite(x, y, def.texture).setDepth(4)
+    // Scale proportionally to fit within tile (maintain aspect ratio to avoid distortion)
+    const maxTowerSize = 58
+    const tScale = maxTowerSize / Math.max(sprite.width, sprite.height)
+    sprite.setScale(tScale)
     this.towerGroup.add(sprite)
 
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
@@ -1023,11 +1027,11 @@ export class GameScene extends Phaser.Scene {
     if (type === 'cannon') this.showTutorial('Tut_PlaceCannon')
     if (type === 'scout') this.showTutorial('Tut_ScoutTower')
 
-    // Place animation — pop-in effect
-    sprite.setAlpha(0)
-    sprite.setDisplaySize(20, 20)
+    // Place animation — pop-in effect using scale
+    const finalScale = sprite.scaleX
+    sprite.setAlpha(0).setScale(0.15)
     this.tweens.add({
-      targets: sprite, alpha: 1, displayWidth: 54, displayHeight: 54,
+      targets: sprite, alpha: 1, scaleX: finalScale, scaleY: finalScale,
       duration: 250, ease: 'Back.easeOut',
     })
   }
@@ -1081,10 +1085,15 @@ export class GameScene extends Phaser.Scene {
           if (upgrade.splash) tower.splash = Math.round(upgrade.splash * this.boosts.aoe)
           if (upgrade.slow) tower.slow = Math.max(upgrade.slow * this.boosts.iceSlow, 0.1)
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
-          // Swap sprite texture
+          // Swap sprite texture and rescale for new proportions
           if (def.textures && def.textures[tower.level]) {
             const newTex = def.textures[tower.level]
-            if (this.textures.exists(newTex)) tower.sprite.setTexture(newTex)
+            if (this.textures.exists(newTex)) {
+              tower.sprite.setTexture(newTex)
+              const maxSize = 58
+              const newScale = maxSize / Math.max(tower.sprite.width, tower.sprite.height)
+              tower.sprite.setScale(newScale)
+            }
           }
           if (tower.type === 'catapult') this.maxCatapultLevel = Math.max(this.maxCatapultLevel, tower.level + 1)
           this.updateHUD()
@@ -1221,7 +1230,7 @@ export class GameScene extends Phaser.Scene {
 
   spawnEnemy(def, type) {
     const start = this.waypoints[0]
-    const spriteSize = def.boss ? 56 : def.size ? Math.round(40 * def.size) : 40
+    const targetSize = def.boss ? 60 : def.size ? Math.round(44 * def.size) : 44
 
     // Use animated sprite if walk animation exists for this enemy type
     const baseType = type.replace('boss_', '')
@@ -1229,8 +1238,11 @@ export class GameScene extends Phaser.Scene {
     const hasAnim = this.anims.exists(animKey)
 
     const sprite = hasAnim
-      ? this.add.sprite(start.x, start.y, def.texture).setDisplaySize(spriteSize, spriteSize).setDepth(6)
-      : this.add.image(start.x, start.y, def.texture).setDisplaySize(spriteSize, spriteSize).setDepth(6)
+      ? this.add.sprite(start.x, start.y, def.texture).setDepth(6)
+      : this.add.image(start.x, start.y, def.texture).setDepth(6)
+    // Scale proportionally to maintain aspect ratio
+    const eScale = targetSize / Math.max(sprite.width, sprite.height)
+    sprite.setScale(eScale)
     this.enemyGroup.add(sprite)
 
     // Play walk animation if available
@@ -1244,7 +1256,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // HP bar
-    const barWidth = Math.max(28, spriteSize)
+    const barWidth = Math.max(28, Math.round(sprite.displayWidth))
     const hpBg = this.add.graphics().setDepth(7)
     const hpBar = this.add.graphics().setDepth(8)
 
@@ -1850,11 +1862,12 @@ export class GameScene extends Phaser.Scene {
       const offsetX = Phaser.Math.Between(-15, 15)
       const offsetY = Phaser.Math.Between(-15, 15)
 
-      const spriteSize = Math.round(40 * (babyDef.size || 0.6))
+      const targetSize = Math.round(44 * (babyDef.size || 0.6))
       const sprite = this.add.image(enemy.sprite.x + offsetX, enemy.sprite.y + offsetY, babyDef.texture)
-        .setDisplaySize(spriteSize, spriteSize)
         .setDepth(6)
         .setTint(0x88ff88) // green tint for babies
+      const babyScale = targetSize / Math.max(sprite.width, sprite.height)
+      sprite.setScale(babyScale)
       this.enemyGroup.add(sprite)
 
       const scaledHp = Math.round(babyDef.hp * this.diffMult.enemyHp)
