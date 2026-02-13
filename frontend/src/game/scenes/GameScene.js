@@ -44,6 +44,15 @@ export class GameScene extends Phaser.Scene {
     this.selectedTowerType = null
     this.gameOver = false
     this.paused = false
+    this.deployables = [] // Active deployables on the map
+
+    // Special weapon charges
+    this.weaponCharges = {
+      powderKeg: 1 + (ups.powderKegBoost || 0),
+      mine: 1 + (ups.mineBoost || 0),
+      gas: 1 + (ups.gasCloudBoost || 0),
+    }
+    this.activeWeapon = null // Currently selected weapon for placement
 
     // Build the path waypoints from the grid
     this.waypoints = this.buildPath(this.levelData.grid)
@@ -63,6 +72,9 @@ export class GameScene extends Phaser.Scene {
 
     // Tower build panel
     this.createBuildPanel()
+
+    // Weapon bar (above build panel)
+    this.createWeaponBar()
 
     // Range indicator (hidden by default)
     this.rangeIndicator = this.add.image(0, 0, 'range_indicator').setVisible(false).setAlpha(0.3).setDepth(5)
@@ -280,6 +292,60 @@ export class GameScene extends Phaser.Scene {
     })
   }
 
+  createWeaponBar() {
+    const w = this.cameras.main.width
+    const barY = this.cameras.main.height - 105
+
+    const weapons = [
+      { key: 'powderKeg', name: 'Keg', color: '#e74c3c', symbol: '\u2620' },
+      { key: 'mine', name: 'Mine', color: '#f39c12', symbol: '\u26A0' },
+      { key: 'gas', name: 'Gas', color: '#2ecc71', symbol: '\u2601' },
+    ]
+
+    this.weaponButtons = {}
+    const startX = w - 180
+
+    weapons.forEach((wpn, i) => {
+      const x = startX + i * 55
+      const charges = this.weaponCharges[wpn.key]
+
+      const btn = this.add.text(x, barY, `${wpn.symbol}${charges}`, {
+        fontSize: '14px',
+        color: charges > 0 ? wpn.color : '#555',
+        fontStyle: 'bold',
+        stroke: '#000',
+        strokeThickness: 2,
+        backgroundColor: '#16213e80',
+        padding: { x: 6, y: 4 },
+      }).setDepth(20).setInteractive({ useHandCursor: charges > 0 })
+
+      if (charges > 0) {
+        btn.on('pointerdown', () => {
+          if (this.activeWeapon === wpn.key) {
+            this.activeWeapon = null
+          } else {
+            this.activeWeapon = wpn.key
+            this.selectedTowerType = null
+            this.updateBuildHighlights()
+          }
+          this.updateWeaponHighlights()
+        })
+      }
+
+      this.weaponButtons[wpn.key] = btn
+    })
+  }
+
+  updateWeaponHighlights() {
+    Object.entries(this.weaponButtons).forEach(([key, btn]) => {
+      if (key === this.activeWeapon) {
+        btn.setStyle({ backgroundColor: '#e9456080' })
+      } else {
+        btn.setStyle({ backgroundColor: '#16213e80' })
+      }
+    })
+  }
+
   updateBuildHighlights() {
     if (!this.buildIcons) return
     this.buildIcons.forEach((icon) => {
@@ -292,10 +358,115 @@ export class GameScene extends Phaser.Scene {
     })
   }
 
+  deployWeapon(x, y) {
+    if (!this.activeWeapon || this.weaponCharges[this.activeWeapon] <= 0) return
+
+    const weaponKey = this.activeWeapon
+
+    if (weaponKey === 'powderKeg') {
+      // Powder Keg: Instant AOE damage at location
+      this.weaponCharges.powderKeg--
+      const radius = 80
+      const damage = 150
+
+      // Explosion visual
+      const boom = this.add.graphics().setDepth(11)
+      boom.fillStyle(0xe74c3c, 0.6)
+      boom.fillCircle(x, y, radius)
+      this.tweens.add({
+        targets: boom,
+        alpha: 0,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 500,
+        onComplete: () => boom.destroy(),
+      })
+
+      // Damage enemies in radius
+      this.enemies.forEach(enemy => {
+        if (!enemy.sprite.active) return
+        const dx = enemy.sprite.x - x
+        const dy = enemy.sprite.y - y
+        if (Math.sqrt(dx * dx + dy * dy) <= radius) {
+          this.damageEnemy(enemy, damage)
+        }
+      })
+
+    } else if (weaponKey === 'mine') {
+      // Mine: Place on path, explodes when enemy walks over
+      this.weaponCharges.mine--
+      const mine = this.add.graphics().setDepth(3)
+      mine.fillStyle(0xf39c12, 0.7)
+      mine.fillCircle(0, 0, 8)
+      mine.lineStyle(1, 0x000000)
+      mine.strokeCircle(0, 0, 8)
+      mine.setPosition(x, y)
+
+      this.deployables.push({
+        type: 'mine',
+        graphics: mine,
+        x, y,
+        radius: 50,
+        damage: 200,
+        active: true,
+      })
+
+    } else if (weaponKey === 'gas') {
+      // Gas: Area DOT at location for 5 seconds
+      this.weaponCharges.gas--
+      const cloud = this.add.graphics().setDepth(3)
+      cloud.fillStyle(0x2ecc71, 0.3)
+      cloud.fillCircle(0, 0, 60)
+      cloud.setPosition(x, y)
+
+      const gasObj = {
+        type: 'gas',
+        graphics: cloud,
+        x, y,
+        radius: 60,
+        dps: 30, // damage per second
+        timer: 5000,
+        active: true,
+      }
+      this.deployables.push(gasObj)
+
+      // Fade out over lifetime
+      this.tweens.add({
+        targets: cloud,
+        alpha: 0,
+        duration: 5000,
+        onComplete: () => {
+          cloud.destroy()
+          gasObj.active = false
+        },
+      })
+    }
+
+    // Update button display
+    this.activeWeapon = null
+    this.updateWeaponHighlights()
+    // Refresh weapon bar text
+    Object.entries(this.weaponButtons).forEach(([key, btn]) => {
+      const charges = this.weaponCharges[key]
+      const symbols = { powderKeg: '\u2620', mine: '\u26A0', gas: '\u2601' }
+      btn.setText(`${symbols[key]}${charges}`)
+      if (charges <= 0) {
+        btn.setColor('#555')
+        btn.disableInteractive()
+      }
+    })
+  }
+
   handleClick(pointer) {
     if (this.gameOver) return
     // Ignore clicks on HUD areas
     if (pointer.y < 36 || pointer.y > this.cameras.main.height - 80) return
+
+    // Deploy weapon if active
+    if (this.activeWeapon) {
+      this.deployWeapon(pointer.x, pointer.y)
+      return
+    }
 
     const col = Math.floor(pointer.x / TILE)
     const row = Math.floor(pointer.y / TILE)
@@ -332,6 +503,15 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add.image(x, y, def.texture).setDisplaySize(40, 40).setDepth(4)
     this.towerGroup.add(sprite)
 
+    // Tower HP: base 100, boosted by shop upgrade
+    const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
+    const baseHp = 100
+    const maxHp = Math.round(baseHp * healthMult)
+
+    // Tower HP bar (hidden until damaged)
+    const hpBg = this.add.graphics().setDepth(5).setVisible(false)
+    const hpBar = this.add.graphics().setDepth(5).setVisible(false)
+
     const tower = {
       sprite,
       type,
@@ -347,6 +527,11 @@ export class GameScene extends Phaser.Scene {
       projectileTexture: def.projectile,
       lastFired: 0,
       level: 0,
+      hp: maxHp,
+      maxHp,
+      hpBg,
+      hpBar,
+      autoHealRate: (this.saveData.upgrades.towerAutoHealBoost || 0) * 0.5,
     }
 
     this.towers.push(tower)
@@ -561,8 +746,59 @@ export class GameScene extends Phaser.Scene {
       enemy.hpBar.fillRect(-14, -20, 28 * hpRatio, 4)
     })
 
+    // Enemy melee attacks on towers (enemies damage nearby towers)
+    this.enemies.forEach(enemy => {
+      if (!enemy.sprite.active) return
+      this.towers.forEach(tower => {
+        if (tower.hp <= 0) return
+        const dx = enemy.sprite.x - tower.x
+        const dy = enemy.sprite.y - tower.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        // Melee range = 1.2 tiles
+        if (dist < TILE * 1.2) {
+          // Damage tower (scaled by delta for frame-rate independence)
+          const dps = enemy.damage * 5 // 5 damage per second per base damage
+          tower.hp -= (dps * delta) / 1000
+          if (tower.hp <= 0) {
+            tower.hp = 0
+            this.destroyTower(tower)
+          }
+        }
+      })
+    })
+
+    // Tower auto-heal and HP bar rendering
+    this.towers = this.towers.filter(tower => {
+      if (tower.hp <= 0) return false
+
+      // Auto-heal
+      if (tower.autoHealRate > 0 && tower.hp < tower.maxHp) {
+        tower.hp = Math.min(tower.maxHp, tower.hp + (tower.autoHealRate * delta) / 1000)
+      }
+
+      // Update tower HP bar (only show when damaged)
+      if (tower.hp < tower.maxHp) {
+        tower.hpBg.setVisible(true).setPosition(tower.x, tower.y)
+        tower.hpBar.setVisible(true).setPosition(tower.x, tower.y)
+        tower.hpBg.clear()
+        tower.hpBg.fillStyle(0x333333)
+        tower.hpBg.fillRect(-18, 18, 36, 4)
+        tower.hpBar.clear()
+        const ratio = tower.hp / tower.maxHp
+        const barColor = ratio > 0.5 ? 0x2ecc71 : ratio > 0.25 ? 0xf39c12 : 0xe74c3c
+        tower.hpBar.fillStyle(barColor)
+        tower.hpBar.fillRect(-18, 18, 36 * ratio, 4)
+      } else {
+        tower.hpBg.setVisible(false)
+        tower.hpBar.setVisible(false)
+      }
+
+      return true
+    })
+
     // Tower firing
     this.towers.forEach(tower => {
+      if (tower.hp <= 0) return
       if (time - tower.lastFired < tower.fireRate) return
 
       // Find closest enemy in range
@@ -609,6 +845,63 @@ export class GameScene extends Phaser.Scene {
       if (proj.target && proj.target.sprite.active) {
         proj.targetX = proj.target.sprite.x
         proj.targetY = proj.target.sprite.y
+      }
+
+      return true
+    })
+
+    // Process deployables (mines and gas clouds)
+    this.deployables = this.deployables.filter(dep => {
+      if (!dep.active) return false
+
+      if (dep.type === 'mine') {
+        // Check if any enemy walks over the mine
+        for (const enemy of this.enemies) {
+          if (!enemy.sprite.active) continue
+          const dx = enemy.sprite.x - dep.x
+          const dy = enemy.sprite.y - dep.y
+          if (Math.sqrt(dx * dx + dy * dy) < 20) {
+            // Explode!
+            dep.active = false
+            dep.graphics.destroy()
+            // Damage all enemies in radius
+            const boom = this.add.graphics().setDepth(11)
+            boom.fillStyle(0xf39c12, 0.5)
+            boom.fillCircle(dep.x, dep.y, dep.radius)
+            this.tweens.add({
+              targets: boom, alpha: 0, duration: 400,
+              onComplete: () => boom.destroy(),
+            })
+            this.enemies.forEach(e => {
+              if (!e.sprite.active) return
+              const edx = e.sprite.x - dep.x
+              const edy = e.sprite.y - dep.y
+              if (Math.sqrt(edx * edx + edy * edy) <= dep.radius) {
+                this.damageEnemy(e, dep.damage)
+              }
+            })
+            return false
+          }
+        }
+        return true
+      }
+
+      if (dep.type === 'gas') {
+        // Damage enemies in gas cloud each frame
+        dep.timer -= delta
+        if (dep.timer <= 0) {
+          dep.active = false
+          return false
+        }
+        this.enemies.forEach(enemy => {
+          if (!enemy.sprite.active) return
+          const dx = enemy.sprite.x - dep.x
+          const dy = enemy.sprite.y - dep.y
+          if (Math.sqrt(dx * dx + dy * dy) <= dep.radius) {
+            this.damageEnemy(enemy, (dep.dps * delta) / 1000)
+          }
+        })
+        return true
       }
 
       return true
@@ -750,6 +1043,23 @@ export class GameScene extends Phaser.Scene {
 
     this.gemDrops = this.gemDrops.filter(g => g !== gemDrop)
     this.updateHUD()
+  }
+
+  destroyTower(tower) {
+    // Visual destruction effect
+    this.tweens.add({
+      targets: tower.sprite,
+      alpha: 0,
+      scaleX: 0.3,
+      scaleY: 0.3,
+      duration: 300,
+      onComplete: () => {
+        tower.sprite.destroy()
+        tower.hpBg.destroy()
+        tower.hpBar.destroy()
+      },
+    })
+    tower.hp = 0
   }
 
   removeEnemy(enemy) {
