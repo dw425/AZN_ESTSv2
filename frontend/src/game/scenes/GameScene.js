@@ -1997,7 +1997,10 @@ export class GameScene extends Phaser.Scene {
           if (dist <= tower.range) {
             let score
             if (mode === 'first') {
-              score = enemy.waypointIndex * 10000 - dist
+              // Normalize progress so flying (2 waypoints) and ground (10+ waypoints) are comparable
+              const enemyWp = enemy.flying ? this.flyWaypoints : this.waypoints
+              const progress = enemy.waypointIndex / enemyWp.length
+              score = progress * 10000 - dist
             } else if (mode === 'strong') {
               score = enemy.maxHp * 10000 + enemy.hp
             } else if (mode === 'weak') {
