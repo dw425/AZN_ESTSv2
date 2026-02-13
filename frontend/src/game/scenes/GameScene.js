@@ -1993,15 +1993,16 @@ export class GameScene extends Phaser.Scene {
       const dy = proj.targetY - proj.sprite.y
       const dist = Math.sqrt(dx * dx + dy * dy)
 
-      if (dist < 10) {
+      const projSpeeds = { ballista: 500, cannon: 350, catapult: 280, scout: 600, winter: 400, storm: 450 }
+      const baseSpeed = projSpeeds[proj.towerType] || 400
+      const speed = (baseSpeed * speedDelta) / 1000
+
+      // Speed-aware hit threshold to prevent overshoot oscillation at 3x speed
+      if (dist < Math.max(10, speed * 1.5)) {
         this.handleProjectileHit(proj)
         proj.sprite.destroy()
         return false
       }
-
-      const projSpeeds = { ballista: 500, cannon: 350, catapult: 280, scout: 600, winter: 400, storm: 450 }
-      const baseSpeed = projSpeeds[proj.towerType] || 400
-      const speed = (baseSpeed * speedDelta) / 1000
 
       if (proj.arc && proj.arcTotalDist > 0) {
         // Arc trajectory for catapult/cannon — parabolic Y offset
@@ -2746,19 +2747,20 @@ export class GameScene extends Phaser.Scene {
       const nx = dirX / dirLen, ny = dirY / dirLen
       const breathRange = 150
       const breathDamage = 15
-      this.towers.forEach(tower => {
-        if (tower.hp <= 0) return
+      // Pre-collect targets before damaging (safe iteration pattern)
+      const breathTargets = this.towers.filter(tower => {
+        if (tower.hp <= 0) return false
         const dx = tower.x - ex, dy = tower.y - ey
         const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist > breathRange) return
-        // Check if tower is roughly in front of dragon (dot product > 0.3)
+        if (dist > breathRange) return false
         const dot = (dx / dist) * nx + (dy / dist) * ny
-        if (dot > 0.3) {
-          tower.hp -= breathDamage
-          tower._damageTintTimer = 300
-          tower.sprite.setTint(0xff4444)
-          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
-        }
+        return dot > 0.3
+      })
+      breathTargets.forEach(tower => {
+        tower.hp -= breathDamage
+        tower._damageTintTimer = 300
+        tower.sprite.setTint(0xff4444)
+        if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
       })
       // Fire breath visual — cone shape
       const fb = this.add.graphics().setDepth(11).setPosition(ex, ey)
