@@ -636,6 +636,14 @@ export class GameScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5))
 
+    // Level/wave info
+    const levelName = this.levelData.name || `Level ${this.levelIndex + 1}`
+    const waveInfo = `${levelName} — Wave ${this.currentWave}/${this.levelData.waves.length}`
+    container.add(this.add.text(0, -55, waveInfo, {
+      fontSize: '11px', color: '#888',
+      stroke: '#000', strokeThickness: 1,
+    }).setOrigin(0.5))
+
     const buttons = [
       { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false } },
       { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty }) } },
@@ -643,7 +651,7 @@ export class GameScene extends Phaser.Scene {
     ]
 
     buttons.forEach((btn, i) => {
-      const y = -30 + i * 45
+      const y = -25 + i * 40
       const text = this.add.text(0, y, btn.text, {
         fontSize: '18px', color: btn.color, fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
@@ -1654,6 +1662,11 @@ export class GameScene extends Phaser.Scene {
         // Gel cube special: damages towers it passes near
         if (enemy.towerDamage > 0 && dist < TILE * 1.5) {
           tower.hp -= (enemy.towerDamage * speedDelta) / 1000
+          // Flash tower red periodically when being damaged
+          if (!tower._damageTintTimer || tower._damageTintTimer <= 0) {
+            tower.sprite.setTint(0xff4444)
+            tower._damageTintTimer = 300
+          }
           if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
 
@@ -1661,6 +1674,10 @@ export class GameScene extends Phaser.Scene {
         if (enemy.melee && dist < TILE * 1.2) {
           const dps = enemy.damage * 10
           tower.hp -= (dps * speedDelta) / 1000
+          if (!tower._damageTintTimer || tower._damageTintTimer <= 0) {
+            tower.sprite.setTint(0xff4444)
+            tower._damageTintTimer = 300
+          }
           if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
       })
@@ -1672,6 +1689,11 @@ export class GameScene extends Phaser.Scene {
 
       if (tower.autoHealRate > 0 && tower.hp < tower.maxHp) {
         tower.hp = Math.min(tower.maxHp, tower.hp + (tower.autoHealRate * speedDelta) / 1000)
+      }
+      // Clear damage tint after flash duration
+      if (tower._damageTintTimer > 0) {
+        tower._damageTintTimer -= speedDelta
+        if (tower._damageTintTimer <= 0) tower.sprite.clearTint()
       }
 
       if (tower.hp < tower.maxHp) {
@@ -1902,6 +1924,13 @@ export class GameScene extends Phaser.Scene {
       if (this.currentWave >= this.levelData.waves.length) {
         this.handleGameOver(true)
       } else {
+        // Heal all towers 20% between waves (like original APK)
+        this.towers.forEach(tower => {
+          if (tower.hp > 0 && tower.hp < tower.maxHp) {
+            const heal = Math.round(tower.maxHp * 0.2)
+            tower.hp = Math.min(tower.maxHp, tower.hp + heal)
+          }
+        })
         // Set up countdown for next wave
         this.waveCountdown = 15000
         this.startWaveBtn.setText(`>> START WAVE ${this.currentWave + 1} <<`)
