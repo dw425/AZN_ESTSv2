@@ -110,6 +110,10 @@ export const TOWER_TYPES = {
 //   kamikaze: explodes on nearest tower when reaching it
 //   flying: immune to mines, ignores ground traps
 //   melee: extra tower damage in close range
+//   heals: heals nearby allies (HP/sec in radius)
+//   shieldAura: reduces damage to nearby allies by this fraction
+//   speedBuff: boosts nearby allies' speed by this fraction
+//   tint: hex color tint applied to sprite for visual differentiation
 //   boss: named boss variant, larger sprite
 export const ENEMY_TYPES = {
   slime: {
@@ -215,6 +219,90 @@ export const ENEMY_TYPES = {
     flying: true,
     physResist: 0.25, // 25% physical resistance — tough scales
     magResist: 0.25, // 25% magic resistance — magical nature
+  },
+  // Original APK enemy types recreated with closest available sprites
+  armored_goblin: {
+    name: 'Armored Goblin',
+    texture: 'creep_goblin',
+    hp: 80,
+    speed: 100,
+    reward: 10,
+    damage: 1,
+    physResist: 0.4, // 40% physical resistance — armored
+    tint: 0x8899aa, // steel-blue tint
+  },
+  fast_goblin: {
+    name: 'Fast Goblin',
+    texture: 'creep_goblin',
+    hp: 25,
+    speed: 200,
+    reward: 6,
+    damage: 1,
+    size: 0.8,
+    tint: 0xccff66, // bright green-yellow tint
+  },
+  armored_troll: {
+    name: 'Armored Troll',
+    texture: 'creep_troll',
+    hp: 200,
+    speed: 60,
+    reward: 20,
+    damage: 1,
+    regens: 2,
+    physResist: 0.5, // 50% physical resistance — heavy armor
+    magResist: 0.3, // 30% magic resistance
+    tint: 0x9999bb, // steel-purple tint
+  },
+  shaman: {
+    name: 'Shaman',
+    texture: 'creep_troll',
+    hp: 80,
+    speed: 85,
+    reward: 15,
+    damage: 1,
+    speedBuff: 0.2, // boosts nearby allies' speed by 20%
+    tint: 0x66ff66, // green glow
+  },
+  bat: {
+    name: 'Bat',
+    texture: 'creep_beholder',
+    hp: 40,
+    speed: 180,
+    reward: 6,
+    damage: 1,
+    flying: true,
+    size: 0.5,
+    tint: 0x8866aa, // dark purple
+  },
+  spider: {
+    name: 'Spider',
+    texture: 'creep_slime',
+    hp: 60,
+    speed: 110,
+    reward: 8,
+    damage: 1,
+    tint: 0x664422, // dark brown
+  },
+  healer: {
+    name: 'Healer',
+    texture: 'creep_orc',
+    hp: 100,
+    speed: 75,
+    reward: 18,
+    damage: 1,
+    heals: 5, // heals nearby allies 5 HP/sec
+    tint: 0x44ff88, // green healer glow
+  },
+  shield_bearer: {
+    name: 'Shield Bearer',
+    texture: 'creep_orc',
+    hp: 180,
+    speed: 70,
+    reward: 20,
+    damage: 1,
+    physResist: 0.3,
+    shieldAura: 0.3, // reduces damage to nearby allies by 30%
+    tint: 0x4488ff, // blue shield glow
   },
   // Boss variants
   boss_beholder: {
@@ -329,6 +417,9 @@ export const TUTORIALS = {
   Tut_Chests: { title: 'Treasure Chest!', msg: 'Tap a chest to target it — your towers will shoot it open! Destroy it to claim gold!' },
   Tut_Runes: { title: 'Magic Rune!', msg: 'Runes DOUBLE the stat of nearby towers. Place towers on or near runes!' },
   Tut_ManualTarget: { title: 'Manual Target', msg: 'Tap an enemy to focus all towers on it. Tap empty ground to clear.' },
+  Tut_Healer: { title: 'Enemy Healer!', msg: 'Healers restore HP to nearby enemies! Kill them first to stop the healing.' },
+  Tut_ShieldBearer: { title: 'Shield Bearer!', msg: 'Shield Bearers reduce damage to nearby enemies. Focus fire on them first!' },
+  Tut_Shaman: { title: 'Troll Shaman!', msg: 'Shamans boost the speed of nearby enemies. Take them out quickly!' },
 }
 
 // grid: 15 columns x 10 rows (960/64=15, 640/64=10)
@@ -358,8 +449,8 @@ export const LEVELS = [
     ],
     waves: [
       { enemies: [{ type: 'slime', count: 6, interval: 1200 }] },
-      { enemies: [{ type: 'slime', count: 8, interval: 1000 }, { type: 'goblin', count: 3, interval: 900 }] },
-      { enemies: [{ type: 'goblin', count: 10, interval: 700 }] },
+      { enemies: [{ type: 'slime', count: 8, interval: 1000 }, { type: 'spider', count: 4, interval: 900 }] },
+      { enemies: [{ type: 'goblin', count: 8, interval: 700 }, { type: 'fast_goblin', count: 5, interval: 500 }] },
       { enemies: [{ type: 'troll', count: 6, interval: 1000 }, { type: 'goblin', count: 5, interval: 700 }] },
       { enemies: [{ type: 'orc', count: 3, interval: 1500 }, { type: 'troll', count: 8, interval: 800 }] },
     ],
@@ -386,10 +477,10 @@ export const LEVELS = [
     ],
     waves: [
       { enemies: [{ type: 'troll', count: 8, interval: 900 }] },
-      { enemies: [{ type: 'goblin', count: 12, interval: 600 }] },
+      { enemies: [{ type: 'armored_goblin', count: 8, interval: 700 }, { type: 'bat', count: 4, interval: 800 }] },
       { enemies: [{ type: 'troll', count: 6, interval: 800 }, { type: 'ogre', count: 2, interval: 2500 }] },
       { enemies: [{ type: 'orc', count: 8, interval: 700 }, { type: 'gelcube', count: 4, interval: 1200 }] },
-      { enemies: [{ type: 'ogre', count: 4, interval: 2000 }, { type: 'goblin', count: 10, interval: 500 }] },
+      { enemies: [{ type: 'ogre', count: 4, interval: 2000 }, { type: 'armored_goblin', count: 6, interval: 600 }] },
       { enemies: [{ type: 'ogre', count: 3, interval: 1500 }, { type: 'troll', count: 12, interval: 600 }] },
     ],
   },
@@ -416,8 +507,8 @@ export const LEVELS = [
     waves: [
       { enemies: [{ type: 'orc', count: 10, interval: 800 }] },
       { enemies: [{ type: 'rocketgoblin', count: 15, interval: 500 }] },
-      { enemies: [{ type: 'ogre', count: 3, interval: 2000 }, { type: 'troll', count: 10, interval: 700 }] },
-      { enemies: [{ type: 'gelcube', count: 8, interval: 800 }, { type: 'orc', count: 6, interval: 700 }] },
+      { enemies: [{ type: 'ogre', count: 3, interval: 2000 }, { type: 'shaman', count: 2, interval: 1500 }, { type: 'troll', count: 10, interval: 700 }] },
+      { enemies: [{ type: 'gelcube', count: 8, interval: 800 }, { type: 'armored_troll', count: 3, interval: 1200 }] },
       { enemies: [{ type: 'beholder', count: 2, interval: 3000 }, { type: 'ogre', count: 5, interval: 1500 }] },
       { enemies: [{ type: 'beholder', count: 3, interval: 2000 }, { type: 'rocketgoblin', count: 15, interval: 400 }] },
     ],
@@ -444,10 +535,10 @@ export const LEVELS = [
     ],
     waves: [
       { enemies: [{ type: 'orc', count: 10, interval: 800 }] },
-      { enemies: [{ type: 'rocketgoblin', count: 8, interval: 600 }, { type: 'troll', count: 5, interval: 900 }] },
+      { enemies: [{ type: 'spider', count: 8, interval: 600 }, { type: 'armored_troll', count: 3, interval: 1200 }] },
       { enemies: [{ type: 'ogre', count: 4, interval: 1800 }] },
-      { enemies: [{ type: 'gelcube', count: 6, interval: 1000 }, { type: 'beholder', count: 2, interval: 3000 }] },
-      { enemies: [{ type: 'giant', count: 2, interval: 4000 }, { type: 'orc', count: 12, interval: 600 }] },
+      { enemies: [{ type: 'gelcube', count: 6, interval: 1000 }, { type: 'bat', count: 5, interval: 800 }] },
+      { enemies: [{ type: 'giant', count: 2, interval: 4000 }, { type: 'healer', count: 2, interval: 2000 }, { type: 'orc', count: 12, interval: 600 }] },
     ],
   },
   {
@@ -473,11 +564,11 @@ export const LEVELS = [
     waves: [
       { enemies: [{ type: 'orc', count: 12, interval: 700 }] },
       { enemies: [{ type: 'rocketgoblin', count: 15, interval: 450 }] },
-      { enemies: [{ type: 'beholder', count: 3, interval: 2500 }, { type: 'ogre', count: 6, interval: 1500 }] },
-      { enemies: [{ type: 'giant', count: 2, interval: 4000 }, { type: 'gelcube', count: 10, interval: 800 }] },
-      { enemies: [{ type: 'dragon', count: 1, interval: 5000 }, { type: 'beholder', count: 4, interval: 2000 }] },
+      { enemies: [{ type: 'beholder', count: 3, interval: 2500 }, { type: 'shield_bearer', count: 2, interval: 2000 }, { type: 'ogre', count: 6, interval: 1500 }] },
+      { enemies: [{ type: 'giant', count: 2, interval: 4000 }, { type: 'healer', count: 2, interval: 2000 }, { type: 'gelcube', count: 10, interval: 800 }] },
+      { enemies: [{ type: 'dragon', count: 1, interval: 5000 }, { type: 'shaman', count: 2, interval: 1500 }, { type: 'beholder', count: 4, interval: 2000 }] },
       { enemies: [{ type: 'dragon', count: 2, interval: 3000 }, { type: 'giant', count: 3, interval: 2500 }, { type: 'orc', count: 15, interval: 500 }] },
-      { enemies: [{ type: 'boss_beholder', count: 1, interval: 5000 }, { type: 'beholder', count: 6, interval: 1500 }], boss: true },
+      { enemies: [{ type: 'boss_beholder', count: 1, interval: 5000 }, { type: 'healer', count: 2, interval: 2000 }, { type: 'beholder', count: 6, interval: 1500 }], boss: true },
     ],
   },
   // === WORLD 1 continued: Lonely Forest ===
@@ -529,10 +620,10 @@ export const LEVELS = [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
     ],
     waves: [
-      { enemies: [{ type: 'goblin', count: 10, interval: 700 }] },
-      { enemies: [{ type: 'slime', count: 12, interval: 800 }, { type: 'goblin', count: 5, interval: 600 }] },
-      { enemies: [{ type: 'troll', count: 8, interval: 900 }] },
-      { enemies: [{ type: 'orc', count: 4, interval: 1500 }, { type: 'goblin', count: 10, interval: 500 }] },
+      { enemies: [{ type: 'fast_goblin', count: 10, interval: 500 }] },
+      { enemies: [{ type: 'slime', count: 12, interval: 800 }, { type: 'spider', count: 5, interval: 600 }] },
+      { enemies: [{ type: 'shaman', count: 1, interval: 1500 }, { type: 'troll', count: 8, interval: 900 }] },
+      { enemies: [{ type: 'orc', count: 4, interval: 1500 }, { type: 'armored_goblin', count: 6, interval: 600 }] },
       { enemies: [{ type: 'ogre', count: 2, interval: 2500 }, { type: 'troll', count: 8, interval: 700 }] },
     ],
   },
@@ -558,12 +649,12 @@ export const LEVELS = [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
     ],
     waves: [
-      { enemies: [{ type: 'troll', count: 10, interval: 800 }] },
-      { enemies: [{ type: 'orc', count: 6, interval: 1000 }, { type: 'goblin', count: 8, interval: 600 }] },
+      { enemies: [{ type: 'armored_troll', count: 5, interval: 1000 }] },
+      { enemies: [{ type: 'orc', count: 6, interval: 1000 }, { type: 'fast_goblin', count: 10, interval: 500 }] },
       { enemies: [{ type: 'gelcube', count: 5, interval: 1200 }] },
-      { enemies: [{ type: 'rocketgoblin', count: 10, interval: 500 }, { type: 'orc', count: 5, interval: 1000 }] },
-      { enemies: [{ type: 'ogre', count: 3, interval: 2000 }, { type: 'gelcube', count: 6, interval: 900 }] },
-      { enemies: [{ type: 'beholder', count: 1, interval: 3000 }, { type: 'troll', count: 12, interval: 600 }] },
+      { enemies: [{ type: 'rocketgoblin', count: 10, interval: 500 }, { type: 'healer', count: 2, interval: 1500 }, { type: 'orc', count: 5, interval: 1000 }] },
+      { enemies: [{ type: 'ogre', count: 3, interval: 2000 }, { type: 'shield_bearer', count: 2, interval: 1800 }, { type: 'gelcube', count: 6, interval: 900 }] },
+      { enemies: [{ type: 'beholder', count: 1, interval: 3000 }, { type: 'shaman', count: 2, interval: 1200 }, { type: 'troll', count: 12, interval: 600 }] },
     ],
   },
   // === WORLD 3 continued: Snowy Forest ===
@@ -589,10 +680,10 @@ export const LEVELS = [
     ],
     waves: [
       { enemies: [{ type: 'orc', count: 12, interval: 700 }] },
-      { enemies: [{ type: 'rocketgoblin', count: 12, interval: 500 }, { type: 'goblin', count: 8, interval: 600 }] },
-      { enemies: [{ type: 'ogre', count: 5, interval: 1500 }] },
-      { enemies: [{ type: 'beholder', count: 2, interval: 2500 }, { type: 'orc', count: 10, interval: 600 }] },
-      { enemies: [{ type: 'giant', count: 1, interval: 4000 }, { type: 'ogre', count: 4, interval: 1500 }] },
+      { enemies: [{ type: 'rocketgoblin', count: 12, interval: 500 }, { type: 'armored_goblin', count: 6, interval: 600 }] },
+      { enemies: [{ type: 'ogre', count: 5, interval: 1500 }, { type: 'shield_bearer', count: 2, interval: 2000 }] },
+      { enemies: [{ type: 'bat', count: 6, interval: 800 }, { type: 'healer', count: 2, interval: 1500 }, { type: 'orc', count: 10, interval: 600 }] },
+      { enemies: [{ type: 'giant', count: 1, interval: 4000 }, { type: 'shaman', count: 2, interval: 1800 }, { type: 'ogre', count: 4, interval: 1500 }] },
     ],
   },
   // === WORLD 4: Underworld ===
@@ -618,11 +709,11 @@ export const LEVELS = [
     ],
     waves: [
       { enemies: [{ type: 'gelcube', count: 8, interval: 900 }] },
-      { enemies: [{ type: 'orc', count: 10, interval: 700 }, { type: 'goblin', count: 8, interval: 500 }] },
-      { enemies: [{ type: 'beholder', count: 3, interval: 2000 }] },
-      { enemies: [{ type: 'ogre', count: 5, interval: 1500 }, { type: 'rocketgoblin', count: 10, interval: 400 }] },
-      { enemies: [{ type: 'giant', count: 2, interval: 3000 }, { type: 'beholder', count: 3, interval: 2000 }] },
-      { enemies: [{ type: 'dragon', count: 1, interval: 5000 }, { type: 'ogre', count: 6, interval: 1200 }] },
+      { enemies: [{ type: 'orc', count: 10, interval: 700 }, { type: 'spider', count: 6, interval: 500 }] },
+      { enemies: [{ type: 'bat', count: 5, interval: 800 }, { type: 'beholder', count: 3, interval: 2000 }] },
+      { enemies: [{ type: 'ogre', count: 5, interval: 1500 }, { type: 'healer', count: 2, interval: 1500 }, { type: 'rocketgoblin', count: 10, interval: 400 }] },
+      { enemies: [{ type: 'giant', count: 2, interval: 3000 }, { type: 'shield_bearer', count: 2, interval: 2000 }, { type: 'beholder', count: 3, interval: 2000 }] },
+      { enemies: [{ type: 'dragon', count: 1, interval: 5000 }, { type: 'shaman', count: 2, interval: 1500 }, { type: 'ogre', count: 6, interval: 1200 }] },
     ],
   },
   {

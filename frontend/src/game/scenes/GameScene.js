@@ -1436,7 +1436,7 @@ export class GameScene extends Phaser.Scene {
       yOffset += 18
     }
 
-    const sellValue = Math.floor(tower.totalInvestment * 0.7)
+    const sellValue = Math.floor(tower.totalInvestment * 0.5)
     if (this.textures.exists('hud_sell')) {
       menu.add(this.add.image(25, yOffset - 11, 'hud_sell').setDisplaySize(14, 14))
     }
@@ -1672,6 +1672,10 @@ export class GameScene extends Phaser.Scene {
       // Damage type resistances
       physResist: def.physResist || 0,
       magResist: def.magResist || 0,
+      // Cooperative abilities
+      heals: def.heals || 0, // HP/sec healed to nearby allies
+      shieldAura: def.shieldAura || 0, // damage reduction fraction for nearby allies
+      speedBuff: def.speedBuff || 0, // speed boost fraction for nearby allies
       // Boss special ability
       bossAbility: def.bossAbility || null,
       bossAbilityTimer: 5000, // First ability fires after 5 seconds
@@ -1687,6 +1691,12 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(9)
     }
 
+    // Apply sprite tint for enemy variant differentiation
+    if (def.tint && !def.boss) {
+      sprite.setTint(def.tint)
+      enemy._baseTint = def.tint
+    }
+
     // Show resistance tutorial the first time a resistant enemy spawns
     if (enemy.physResist > 0 || enemy.magResist > 0) {
       this.showTutorial('Tut_DamageResist')
@@ -1694,6 +1704,9 @@ export class GameScene extends Phaser.Scene {
     // Show tutorials on spawn for special enemy types
     if (enemy.regens > 0) this.showTutorial('Tut_TrollRegen')
     if (enemy.towerDamage > 0) this.showTutorial('Tut_GelCubes')
+    if (enemy.heals > 0) this.showTutorial('Tut_Healer')
+    if (enemy.shieldAura > 0) this.showTutorial('Tut_ShieldBearer')
+    if (enemy.speedBuff > 0) this.showTutorial('Tut_Shaman')
 
     this.enemies.push(enemy)
   }
@@ -1723,7 +1736,8 @@ export class GameScene extends Phaser.Scene {
         enemy.slowTimer -= speedDelta
         if (enemy.slowTimer <= 0) {
           enemy.speed = enemy.baseSpeed
-          enemy.sprite.clearTint()
+          if (enemy._baseTint) enemy.sprite.setTint(enemy._baseTint)
+          else enemy.sprite.clearTint()
           if (enemy.boss) enemy.sprite.setTint(0xff6666)
         }
       }
@@ -1731,6 +1745,34 @@ export class GameScene extends Phaser.Scene {
       // Troll regen
       if (enemy.regens > 0 && enemy.hp < enemy.maxHp) {
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + (enemy.regens * speedDelta) / 1000)
+      }
+
+      // Healer ability — heals nearby allies
+      if (enemy.heals > 0) {
+        const healRange = 100
+        this.enemies.forEach(ally => {
+          if (ally === enemy || !ally.sprite || !ally.sprite.active || ally.hp <= 0) return
+          if (ally.hp >= ally.maxHp) return
+          const dx = ally.sprite.x - enemy.sprite.x
+          const dy = ally.sprite.y - enemy.sprite.y
+          if (Math.sqrt(dx * dx + dy * dy) <= healRange) {
+            ally.hp = Math.min(ally.maxHp, ally.hp + (enemy.heals * speedDelta) / 1000)
+          }
+        })
+      }
+
+      // Shaman speed buff — boosts nearby allies' speed
+      if (enemy.speedBuff > 0) {
+        const buffRange = 100
+        this.enemies.forEach(ally => {
+          if (ally === enemy || !ally.sprite || !ally.sprite.active || ally.hp <= 0) return
+          if (ally.slowTimer > 0) return // Don't override slow
+          const dx = ally.sprite.x - enemy.sprite.x
+          const dy = ally.sprite.y - enemy.sprite.y
+          if (Math.sqrt(dx * dx + dy * dy) <= buffRange) {
+            ally.speed = Math.max(ally.speed, ally.baseSpeed * (1 + enemy.speedBuff))
+          }
+        })
       }
 
       // Boss special abilities — periodic effects
@@ -2437,6 +2479,20 @@ export class GameScene extends Phaser.Scene {
         damage = Math.round(damage * (1 - enemy.magResist))
       }
     }
+
+    // Shield bearer aura — nearby shield bearers reduce damage to this enemy
+    if (enemy.sprite && enemy.sprite.active) {
+      for (const ally of this.enemies) {
+        if (ally === enemy || ally.hp <= 0 || !ally.shieldAura || !ally.sprite || !ally.sprite.active) continue
+        const dx = ally.sprite.x - enemy.sprite.x
+        const dy = ally.sprite.y - enemy.sprite.y
+        if (Math.sqrt(dx * dx + dy * dy) <= 80) {
+          damage = Math.round(damage * (1 - ally.shieldAura))
+          break // Only one shield aura applies at a time
+        }
+      }
+    }
+
     damage = Math.max(1, damage) // Always deal at least 1 damage
     enemy.hp -= damage
 
@@ -3151,11 +3207,19 @@ export class GameScene extends Phaser.Scene {
     const enemyPool = [
       { type: 'slime', minWave: 1 },
       { type: 'goblin', minWave: 1 },
+      { type: 'spider', minWave: 2 },
+      { type: 'fast_goblin', minWave: 2 },
       { type: 'orc', minWave: 3 },
       { type: 'troll', minWave: 4 },
+      { type: 'armored_goblin', minWave: 4 },
+      { type: 'bat', minWave: 5 },
       { type: 'gelcube', minWave: 5 },
-      { type: 'ogre', minWave: 7 },
+      { type: 'shaman', minWave: 6 },
       { type: 'rocketgoblin', minWave: 6 },
+      { type: 'ogre', minWave: 7 },
+      { type: 'healer', minWave: 8 },
+      { type: 'shield_bearer', minWave: 8 },
+      { type: 'armored_troll', minWave: 9 },
       { type: 'beholder', minWave: 10 },
       { type: 'giant', minWave: 12 },
       { type: 'dragon', minWave: 15 },
@@ -3198,6 +3262,9 @@ export class GameScene extends Phaser.Scene {
       if (def.physResist > 0) info += ' \u{1F6E1}' // shield = physical resist
       if (def.magResist > 0) info += ' \u2728' // sparkle = magic resist
       if (def.flying) info += ' \u2708' // airplane = flying
+      if (def.heals) info += ' \u{1F49A}' // green heart = healer
+      if (def.shieldAura) info += ' \u{1F6E1}' // shield = aura
+      if (def.speedBuff) info += ' \u26A1' // lightning = speed buff
       if (def.boss) info += ' \u{1F451}' // crown = boss
       return info
     })
