@@ -96,8 +96,8 @@ export class MenuScene extends Phaser.Scene {
         this.menuMusic = existing
         return
       }
-      // Stop any other music that might be playing
-      this.sound.stopAll()
+      // Stop only existing music tracks, not SFX
+      this.stopMenuMusic()
       if (this.cache.audio.exists('music_menu')) {
         this.menuMusic = this.sound.add('music_menu', { loop: true, volume: 0.3 })
         this.menuMusic.play()
@@ -107,7 +107,7 @@ export class MenuScene extends Phaser.Scene {
 
   stopMenuMusic() {
     try {
-      this.sound.stopAll()
+      if (this.menuMusic && this.menuMusic.isPlaying) this.menuMusic.stop()
     } catch (e) { /* ignore */ }
   }
 }

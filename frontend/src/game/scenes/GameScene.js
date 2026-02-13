@@ -104,6 +104,17 @@ export class GameScene extends Phaser.Scene {
       this.tweens.killAll()
       this.time.removeAllEvents()
       this.input.removeAllListeners()
+      // Destroy remaining game objects
+      this.projectiles.forEach(p => { try { if (p.sprite.active) p.sprite.destroy() } catch (e) {} })
+      this.projectiles = []
+      this.deployables.forEach(d => { try { d.graphics.destroy() } catch (e) {} })
+      this.deployables = []
+      this.gemDrops.forEach(g => {
+        try { if (g.graphics.active) g.graphics.destroy() } catch (e) {}
+        try { if (g.zone) g.zone.destroy() } catch (e) {}
+      })
+      this.gemDrops = []
+      if (this.towerMenu) { try { this.towerMenu.destroy() } catch (e) {} }
     })
 
     this.drawMap()
@@ -224,8 +235,8 @@ export class GameScene extends Phaser.Scene {
     const musicKey = this.levelData.music
     if (!musicKey) return
     try {
-      // Stop any leftover music from menu or previous level
-      this.sound.stopAll()
+      // Stop only background music, not SFX
+      this.stopMusic()
       if (this.cache.audio.exists(musicKey)) {
         this.bgMusic = this.sound.add(musicKey, { loop: true, volume: 0.3 })
         this.bgMusic.play()
@@ -292,17 +303,71 @@ export class GameScene extends Phaser.Scene {
     }))
   }
 
+  getUndergroundKey(bgKey) {
+    // Underground-themed levels already show the path — no overlay needed
+    if (bgKey.endsWith('_under')) return null
+
+    // Direct mapping: append _under
+    const underKey = bgKey + '_under'
+    if (this.textures.exists(underKey)) return underKey
+
+    // Fallbacks for maps without underground texture variants
+    const fallbacks = {
+      'map_f2': 'map_f1_under',
+      'map_f1night': 'map_f1_under',
+    }
+    const fb = fallbacks[bgKey]
+    if (fb && this.textures.exists(fb)) return fb
+
+    return null
+  }
+
   drawMap() {
     const grid = this.levelData.grid
     const bgKey = this.levelData.mapBg || 'map_grass'
+    const w = this.cameras.main.width
+    const h = this.cameras.main.height
+    const cx = this.cameras.main.centerX
+    const cy = this.cameras.main.centerY
 
     if (this.textures.exists(bgKey)) {
-      this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, bgKey)
-        .setDisplaySize(this.cameras.main.width, this.cameras.main.height)
+      this.add.image(cx, cy, bgKey).setDisplaySize(w, h)
     } else {
       const bg = this.add.graphics()
       bg.fillStyle(0x2d5a27)
-      bg.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
+      bg.fillRect(0, 0, w, h)
+    }
+
+    // Render underground texture on path tiles using a geometry mask
+    // In the original game, paths show through to the underground layer
+    const underKey = this.getUndergroundKey(bgKey)
+    if (underKey) {
+      const underImg = this.add.image(cx, cy, underKey).setDisplaySize(w, h).setDepth(1)
+      const maskShape = this.make.graphics()
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const v = grid[r][c]
+          if (v >= 1 && v <= 3) {
+            maskShape.fillStyle(0xffffff)
+            maskShape.fillRect(c * TILE, r * TILE, TILE, TILE)
+          }
+        }
+      }
+      underImg.setMask(maskShape.createGeometryMask())
+    } else {
+      // Fallback: use pathBrush overlay when no underground texture exists
+      const hasPathBrush = this.textures.exists('path_brush')
+      if (hasPathBrush) {
+        for (let r = 0; r < grid.length; r++) {
+          for (let c = 0; c < grid[r].length; c++) {
+            const v = grid[r][c]
+            if (v >= 1 && v <= 3) {
+              this.add.image(c * TILE + TILE / 2, r * TILE + TILE / 2, 'path_brush')
+                .setDisplaySize(TILE, TILE).setDepth(1).setAlpha(0.5)
+            }
+          }
+        }
+      }
     }
 
     // Render tower platforms on buildable cells (value 0)
@@ -314,21 +379,7 @@ export class GameScene extends Phaser.Scene {
           const py = r * TILE + TILE / 2
           if (hasPlatform) {
             this.add.image(px, py, 'tower_platform')
-              .setDisplaySize(TILE - 2, TILE - 2).setDepth(1).setAlpha(0.5)
-          }
-        }
-      }
-    }
-
-    // Render path indicators on path cells (values 1, 2, 3)
-    const hasPathBrush = this.textures.exists('path_brush')
-    if (hasPathBrush) {
-      for (let r = 0; r < grid.length; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          const v = grid[r][c]
-          if (v >= 1 && v <= 3) {
-            this.add.image(c * TILE + TILE / 2, r * TILE + TILE / 2, 'path_brush')
-              .setDisplaySize(TILE, TILE).setDepth(1).setAlpha(0.35)
+              .setDisplaySize(TILE - 2, TILE - 2).setDepth(1).setAlpha(0.65)
           }
         }
       }
@@ -1028,7 +1079,7 @@ export class GameScene extends Phaser.Scene {
           tower.range = Math.round((upgrade.range || tower.range) * this.boosts.range)
           tower.fireRate = Math.round((upgrade.fireRate || tower.fireRate) * this.boosts.fireRate)
           if (upgrade.splash) tower.splash = Math.round(upgrade.splash * this.boosts.aoe)
-          if (upgrade.slow) tower.slow = Math.min(upgrade.slow * this.boosts.iceSlow, 0.9)
+          if (upgrade.slow) tower.slow = Math.max(upgrade.slow * this.boosts.iceSlow, 0.1)
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
           // Swap sprite texture
           if (def.textures && def.textures[tower.level]) {
@@ -1628,6 +1679,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   fireChainLightning(tower, primary) {
+    if (primary.hp <= 0) return // Target already dead
+
     // Play fire animation for storm tower
     const stormFireAnims = [null, 'storm_2_fire', 'storm_3_fire']
     const stormAnimKey = stormFireAnims[tower.level]
@@ -1704,7 +1757,7 @@ export class GameScene extends Phaser.Scene {
           // Apply slow to all enemies in splash radius (ice tower AoE slow)
           if (proj.slow > 0) {
             enemy.speed = enemy.baseSpeed * proj.slow
-            enemy.slowTimer = proj.slowDuration
+            enemy.slowTimer = Math.max(enemy.slowTimer, proj.slowDuration)
             enemy.sprite.setTint(0x00bcd4)
           }
         }
@@ -1714,7 +1767,7 @@ export class GameScene extends Phaser.Scene {
       // Slow effect on single target
       if (proj.slow > 0) {
         proj.target.speed = proj.target.baseSpeed * proj.slow
-        proj.target.slowTimer = proj.slowDuration
+        proj.target.slowTimer = Math.max(proj.target.slowTimer, proj.slowDuration)
         proj.target.sprite.setTint(0x00bcd4)
       }
     }
@@ -1957,10 +2010,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   removeEnemy(enemy) {
-    enemy.sprite.destroy()
-    enemy.hpBg.destroy()
-    enemy.hpBar.destroy()
-    if (enemy.namePlate) enemy.namePlate.destroy()
+    try { if (enemy.sprite && enemy.sprite.active) enemy.sprite.destroy() } catch (e) {}
+    try { if (enemy.hpBg && enemy.hpBg.active) enemy.hpBg.destroy() } catch (e) {}
+    try { if (enemy.hpBar && enemy.hpBar.active) enemy.hpBar.destroy() } catch (e) {}
+    try { if (enemy.namePlate) enemy.namePlate.destroy() } catch (e) {}
+    // Clear scout tower lastTarget references to prevent memory leaks
+    this.towers.forEach(t => { if (t.lastTarget === enemy) t.lastTarget = null })
     this.enemies = this.enemies.filter(e => e !== enemy)
   }
 
@@ -1968,7 +2023,18 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = true
     this.startWaveBtn.setVisible(false)
     this.countdownText.setVisible(false)
+    if (this.wavePreview) this.wavePreview.setVisible(false)
     this.stopMusic()
+
+    // Clean up active UI elements
+    if (this.towerMenu) { try { this.towerMenu.destroy() } catch (e) {} this.towerMenu = null }
+    this.rangeIndicator.setVisible(false)
+    this.cellIndicator.setVisible(false)
+    this.cellNoIndicator.setVisible(false)
+    // Clean up gem drop zones
+    this.gemDrops.forEach(g => {
+      try { if (g.zone) g.zone.destroy() } catch (e) {}
+    })
 
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
