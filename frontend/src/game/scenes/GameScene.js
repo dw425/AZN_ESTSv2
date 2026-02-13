@@ -98,6 +98,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // Clean up on scene shutdown to prevent memory leaks and freezes
+    this.events.on('shutdown', () => {
+      this.stopMusic()
+      this.tweens.killAll()
+      this.time.removeAllEvents()
+      this.input.removeAllListeners()
+    })
+
     this.drawMap()
 
     this.enemyGroup = this.add.group()
@@ -108,8 +116,9 @@ export class GameScene extends Phaser.Scene {
     this.createBuildPanel()
     this.createWeaponBar()
 
-    // Range indicator (hidden by default)
-    this.rangeIndicator = this.add.image(0, 0, 'range_indicator').setVisible(false).setAlpha(0.3).setDepth(5)
+    // Range indicator (hidden by default) — use loaded hud_range asset
+    const rangeKey = this.textures.exists('hud_range') ? 'hud_range' : 'range_indicator'
+    this.rangeIndicator = this.add.image(0, 0, rangeKey).setVisible(false).setAlpha(0.3).setDepth(5)
 
     // Cell hover indicator (shows buildable/unbuildable)
     const glowKey = this.textures.exists('hud_glow_cell') ? 'hud_glow_cell' : null
@@ -289,19 +298,14 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: portal, alpha: { from: 0.8, to: 0.3 }, duration: 1200, yoyo: true, repeat: -1 })
         }
         if (val === 3) {
-          // Base castle visual — small fortress icon
-          const castle = this.add.graphics().setDepth(2)
-          castle.fillStyle(0x8b4513, 0.8)
-          castle.fillRect(x - 14, y - 12, 28, 24)
-          castle.fillStyle(0xa0522d, 0.9)
-          castle.fillRect(x - 16, y - 18, 10, 16)
-          castle.fillRect(x + 6, y - 18, 10, 16)
-          castle.fillStyle(0x654321, 0.9)
-          castle.fillRect(x - 4, y - 2, 8, 14)
-          this.add.text(x, y + 18, '\u2691', {
-            fontSize: '12px', color: '#e74c3c',
-            stroke: '#000', strokeThickness: 2,
-          }).setOrigin(0.5).setDepth(3).setAlpha(0.8)
+          // Base castle — use health icon as castle marker
+          if (this.textures.exists('hud_health')) {
+            this.add.image(x, y, 'hud_health').setDisplaySize(30, 30).setDepth(2).setAlpha(0.85)
+          }
+          this.add.text(x, y + 20, '\u2691 BASE', {
+            fontSize: '9px', color: '#e74c3c',
+            stroke: '#000', strokeThickness: 2, fontStyle: 'bold',
+          }).setOrigin(0.5).setDepth(3).setAlpha(0.7)
         }
       }
     }
@@ -328,18 +332,18 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(4)
     })
 
-    // Render gold deposits
+    // Render gold deposits — use hud_coin icon or inline graphics (never generated textures)
     this.specialTiles.deposits.forEach(dep => {
       const dx = dep.c * TILE + TILE / 2
       const dy = dep.r * TILE + TILE / 2
-      if (this.textures.exists('gold_deposit')) {
-        dep.sprite = this.add.image(dx, dy, 'gold_deposit').setDisplaySize(32, 32).setDepth(3)
+      if (this.textures.exists('hud_coin')) {
+        dep.sprite = this.add.image(dx, dy, 'hud_coin').setDisplaySize(26, 26).setDepth(3)
       } else {
         dep.sprite = this.add.graphics().setDepth(3)
         dep.sprite.fillStyle(0xf1c40f, 0.8)
-        dep.sprite.fillRoundedRect(dx - 14, dy - 14, 28, 28, 4)
+        dep.sprite.fillCircle(dx, dy, 12)
         dep.sprite.lineStyle(2, 0xd4ac0d)
-        dep.sprite.strokeRoundedRect(dx - 14, dy - 14, 28, 28, 4)
+        dep.sprite.strokeCircle(dx, dy, 12)
       }
       this.add.text(dx, dy + 18, 'GOLD', {
         fontSize: '8px', color: '#f1c40f', fontStyle: 'bold',
@@ -347,19 +351,24 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(4)
     })
 
-    // Render treasure chests
+    // Render treasure chests — inline graphics only (no generated textures)
     this.specialTiles.chests.forEach(chest => {
       const cx = chest.c * TILE + TILE / 2
       const cy = chest.r * TILE + TILE / 2
-      if (this.textures.exists('treasure_chest')) {
-        chest.sprite = this.add.image(cx, cy, 'treasure_chest').setDisplaySize(32, 32).setDepth(3)
-      } else {
-        chest.sprite = this.add.graphics().setDepth(3)
-        chest.sprite.fillStyle(0x8b4513, 0.8)
-        chest.sprite.fillRoundedRect(cx - 14, cy - 10, 28, 20, 3)
-        chest.sprite.fillStyle(0xf1c40f, 0.6)
-        chest.sprite.fillRect(cx - 3, cy - 5, 6, 8)
-      }
+      chest.sprite = this.add.graphics().setDepth(3)
+      // Brown chest body
+      chest.sprite.fillStyle(0x8b4513, 0.85)
+      chest.sprite.fillRoundedRect(cx - 12, cy - 8, 24, 16, 3)
+      // Gold clasp
+      chest.sprite.fillStyle(0xf1c40f, 0.9)
+      chest.sprite.fillRect(cx - 3, cy - 4, 6, 6)
+      // Lid highlight
+      chest.sprite.lineStyle(1, 0xa0522d)
+      chest.sprite.strokeRoundedRect(cx - 12, cy - 8, 24, 16, 3)
+      this.add.text(cx, cy + 14, '\u2666', {
+        fontSize: '8px', color: '#f1c40f',
+        stroke: '#000', strokeThickness: 1,
+      }).setOrigin(0.5).setDepth(4)
     })
   }
 
@@ -683,6 +692,7 @@ export class GameScene extends Phaser.Scene {
     if (weaponKey === 'powderKeg') {
       this.weaponCharges.powderKeg--
       this.playSfx('sfx_explosion')
+      this.showTutorial('Tut_QuickUsePowderKeg')
       const radius = 80
       const damage = 150
 
@@ -709,6 +719,7 @@ export class GameScene extends Phaser.Scene {
     } else if (weaponKey === 'mine') {
       this.weaponCharges.mine--
       this.playSfx('sfx_dig')
+      this.showTutorial('Tut_QuickUseMines')
       const mine = this.add.graphics().setDepth(3)
       mine.fillStyle(0xf39c12, 0.7)
       mine.fillCircle(0, 0, 8)
@@ -724,6 +735,7 @@ export class GameScene extends Phaser.Scene {
     } else if (weaponKey === 'gas') {
       this.weaponCharges.gas--
       this.playSfx('sfx_fuse')
+      this.showTutorial('Tut_QuickUseGas')
       let cloud
       if (this.textures.exists('hud_poison_gas')) {
         cloud = this.add.image(x, y, 'hud_poison_gas').setDisplaySize(120, 120).setDepth(3).setAlpha(0.5)
@@ -852,6 +864,7 @@ export class GameScene extends Phaser.Scene {
         if (rune.type === 'range') tower.range = Math.round(tower.range * 1.2)
         const runeColors = { damage: '#e74c3c', speed: '#3498db', range: '#2ecc71' }
         this.showFloatingText(tower.x, tower.y - 30, `${rune.type.toUpperCase()} RUNE!`, runeColors[rune.type])
+        this.showTutorial('Tut_Runes')
       }
     })
 
@@ -955,6 +968,7 @@ export class GameScene extends Phaser.Scene {
           if (tower.type === 'catapult') this.maxCatapultLevel = Math.max(this.maxCatapultLevel, tower.level + 1)
           this.updateHUD()
           this.playSfx('sfx_tower_upgrade')
+          this.showTutorial('Tut_UpgradeTower')
           menu.destroy()
           this.rangeIndicator.setVisible(false)
         }
@@ -1472,6 +1486,7 @@ export class GameScene extends Phaser.Scene {
       ballista: ['ballista_fire', 'ballista_fire', 'ballista_3_fire'],
       cannon: ['cannon_fire', 'cannon_2_fire', 'cannon_3_fire'],
       catapult: ['catapult_fire', 'catapult_2_fire', 'catapult_3_fire'],
+      scout: [null, null, null],
       storm: [null, 'storm_2_fire', 'storm_3_fire'],
       winter: ['winter_fire', 'winter_2_fire', 'winter_3_fire'],
     }

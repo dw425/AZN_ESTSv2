@@ -12,6 +12,12 @@ export class LevelSelectScene extends Phaser.Scene {
     const h = this.cameras.main.height
     const cx = w / 2
 
+    // Clean up on scene shutdown
+    this.events.on('shutdown', () => {
+      this.tweens.killAll()
+      this.time.removeAllEvents()
+    })
+
     // Background
     if (this.textures.exists('loading_bg')) {
       const bg = this.add.image(cx, h / 2, 'loading_bg')
@@ -24,14 +30,14 @@ export class LevelSelectScene extends Phaser.Scene {
     overlay.fillStyle(0x000000, 0.5)
     overlay.fillRect(0, 0, w, h)
 
-    // Title
-    this.add.text(cx, 30, 'SELECT LEVEL', {
-      fontSize: '28px',
+    // Title — positioned safely below top edge
+    this.add.text(cx, 28, 'SELECT LEVEL', {
+      fontSize: '24px',
       color: '#e94560',
       fontFamily: 'Georgia, serif',
       fontStyle: 'bold',
       stroke: '#000',
-      strokeThickness: 4,
+      strokeThickness: 3,
     }).setOrigin(0.5)
 
     // Load progress from persistent save
@@ -40,10 +46,10 @@ export class LevelSelectScene extends Phaser.Scene {
 
     // Show gem count
     if (this.textures.exists('hud_gem')) {
-      this.add.image(w - 60, 30, 'hud_gem').setDisplaySize(18, 18).setDepth(5)
+      this.add.image(w - 60, 28, 'hud_gem').setDisplaySize(16, 16).setDepth(5)
     }
-    this.add.text(w - 45, 23, `${save.gems}`, {
-      fontSize: '14px', color: '#9b59b6', fontStyle: 'bold',
+    this.add.text(w - 45, 21, `${save.gems}`, {
+      fontSize: '13px', color: '#9b59b6', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
     }).setDepth(5)
 
@@ -59,16 +65,16 @@ export class LevelSelectScene extends Phaser.Scene {
 
     // Page navigation arrows
     if (this.totalPages > 1) {
-      const prevBtn = this.add.text(30, h / 2, '\u25C0', {
-        fontSize: '30px', color: '#aaa', fontStyle: 'bold',
+      const prevBtn = this.add.text(20, h / 2, '\u25C0', {
+        fontSize: '24px', color: '#aaa', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 3,
       }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10)
       prevBtn.on('pointerdown', () => { if (this.currentPage > 0) { this.currentPage--; this.drawPage() } })
       prevBtn.on('pointerover', () => prevBtn.setColor('#e94560'))
       prevBtn.on('pointerout', () => prevBtn.setColor('#aaa'))
 
-      const nextBtn = this.add.text(w - 30, h / 2, '\u25B6', {
-        fontSize: '30px', color: '#aaa', fontStyle: 'bold',
+      const nextBtn = this.add.text(w - 20, h / 2, '\u25B6', {
+        fontSize: '24px', color: '#aaa', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 3,
       }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10)
       nextBtn.on('pointerdown', () => { if (this.currentPage < this.totalPages - 1) { this.currentPage++; this.drawPage() } })
@@ -76,22 +82,22 @@ export class LevelSelectScene extends Phaser.Scene {
       nextBtn.on('pointerout', () => nextBtn.setColor('#aaa'))
 
       // Page indicator
-      this.pageText = this.add.text(cx, h - 55, '', {
-        fontSize: '13px', color: '#888',
+      this.pageText = this.add.text(cx, h - 50, '', {
+        fontSize: '12px', color: '#888',
         stroke: '#000', strokeThickness: 1,
       }).setOrigin(0.5).setDepth(10)
     }
 
     // Back button using asset
     if (this.textures.exists('back_button')) {
-      const backImg = this.add.image(45, h - 30, 'back_button')
-        .setDisplaySize(80, 35).setInteractive({ useHandCursor: true }).setDepth(10)
+      const backImg = this.add.image(45, h - 28, 'back_button')
+        .setDisplaySize(70, 30).setInteractive({ useHandCursor: true }).setDepth(10)
       backImg.on('pointerdown', () => this.scene.start('MenuScene'))
       backImg.on('pointerover', () => backImg.setTint(0xddaa66))
       backImg.on('pointerout', () => backImg.clearTint())
     } else {
-      const backBtn = this.add.text(60, h - 35, '< Back', {
-        fontSize: '20px', color: '#aaa', fontStyle: 'bold',
+      const backBtn = this.add.text(50, h - 32, '< Back', {
+        fontSize: '16px', color: '#aaa', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
       }).setInteractive({ useHandCursor: true }).setDepth(10)
       backBtn.on('pointerdown', () => this.scene.start('MenuScene'))
@@ -103,13 +109,13 @@ export class LevelSelectScene extends Phaser.Scene {
     this.diffPopup = null
 
     // Shop button
-    const shopBtn = this.add.text(w - 80, h - 30, 'Shop', {
-      fontSize: '18px',
+    const shopBtn = this.add.text(w - 70, h - 28, 'Shop', {
+      fontSize: '16px',
       color: '#9b59b6',
       fontStyle: 'bold',
       stroke: '#000',
       strokeThickness: 2,
-    }).setInteractive({ useHandCursor: true }).setDepth(10)
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10)
     shopBtn.on('pointerdown', () => this.scene.start('ShopScene'))
     shopBtn.on('pointerover', () => shopBtn.setColor('#c39bd3'))
     shopBtn.on('pointerout', () => shopBtn.setColor('#9b59b6'))
@@ -128,53 +134,61 @@ export class LevelSelectScene extends Phaser.Scene {
     const endIdx = Math.min(startIdx + this.levelsPerPage, LEVELS.length)
     const pageLevels = LEVELS.slice(startIdx, endIdx)
 
+    // Layout: 5 columns, up to 4 rows
+    // Available area: top=55, bottom=h-65, sides=45
     const cols = 5
-    const cardW = 105
-    const cardH = 120
-    const gap = 12
+    const topMargin = 55
+    const bottomMargin = h - 60
+    const sideMargin = 45
+    const availW = w - sideMargin * 2
+    const availH = bottomMargin - topMargin
     const rows = Math.ceil(pageLevels.length / cols)
-    const totalW = cols * cardW + (cols - 1) * gap
-    const totalH = rows * cardH + (rows - 1) * gap
-    const startX = cx - totalW / 2 + cardW / 2
-    const startY = 60 + (h - 120 - totalH) / 2
+
+    const cardW = Math.min(90, (availW - (cols - 1) * 8) / cols)
+    const cardH = Math.min(100, (availH - (rows - 1) * 6) / rows)
+    const gapX = (availW - cols * cardW) / Math.max(cols - 1, 1)
+    const gapY = (availH - rows * cardH) / Math.max(rows - 1, 1)
+
+    const startX = sideMargin + cardW / 2
+    const startY = topMargin + cardH / 2
 
     pageLevels.forEach((level, idx) => {
       const i = startIdx + idx
       const col = idx % cols
       const row = Math.floor(idx / cols)
-      const x = startX + col * (cardW + gap)
-      const y = startY + row * (cardH + gap)
+      const x = startX + col * (cardW + gapX)
+      const y = startY + row * (cardH + gapY)
       const unlocked = i < progress
 
-      // Stone tablet background
+      // Card background — use map icons if available
       const iconKey = unlocked ? 'map_icon' : 'map_icon_locked'
       if (this.textures.exists(iconKey)) {
-        const tablet = this.add.image(x, y - 8, iconKey).setDisplaySize(70, 80)
+        const tablet = this.add.image(x, y - 5, iconKey).setDisplaySize(cardW * 0.75, cardH * 0.7)
         if (!unlocked) tablet.setTint(0x555555)
         this.pageContainer.add(tablet)
       } else {
         const bg = this.add.graphics()
         bg.fillStyle(unlocked ? 0x16213e : 0x111111, 0.9)
-        bg.fillRoundedRect(x - 40, y - 48, 80, 88, 6)
-        if (unlocked) { bg.lineStyle(2, 0xe94560); bg.strokeRoundedRect(x - 40, y - 48, 80, 88, 6) }
+        bg.fillRoundedRect(x - cardW / 2 + 4, y - cardH / 2 + 2, cardW - 8, cardH - 8, 5)
+        if (unlocked) { bg.lineStyle(1, 0xe94560, 0.6); bg.strokeRoundedRect(x - cardW / 2 + 4, y - cardH / 2 + 2, cardW - 8, cardH - 8, 5) }
         this.pageContainer.add(bg)
       }
 
-      // World icon image
+      // World icon image or level number
       const worldKey = `world_${level.world || (i + 1)}`
       if (unlocked && this.textures.exists(worldKey)) {
-        this.pageContainer.add(this.add.image(x, y - 12, worldKey).setDisplaySize(52, 44))
+        this.pageContainer.add(this.add.image(x, y - 8, worldKey).setDisplaySize(cardW * 0.5, cardH * 0.35))
       } else {
-        this.pageContainer.add(this.add.text(x, y - 12, `${i + 1}`, {
-          fontSize: '24px', color: unlocked ? '#fff' : '#444', fontStyle: 'bold',
+        this.pageContainer.add(this.add.text(x, y - 10, `${i + 1}`, {
+          fontSize: '18px', color: unlocked ? '#fff' : '#444', fontStyle: 'bold',
           stroke: '#000', strokeThickness: 2,
         }).setOrigin(0.5))
       }
 
       // Level name
-      this.pageContainer.add(this.add.text(x, y + 34, level.name, {
-        fontSize: '11px', color: unlocked ? '#ddd' : '#555', fontStyle: 'bold',
-        stroke: '#000', strokeThickness: 2,
+      this.pageContainer.add(this.add.text(x, y + cardH * 0.28, level.name, {
+        fontSize: '9px', color: unlocked ? '#ddd' : '#555', fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 1,
       }).setOrigin(0.5))
 
       // Star display
@@ -182,16 +196,12 @@ export class LevelSelectScene extends Phaser.Scene {
       if (starCount > 0) {
         let starStr = ''
         for (let s = 0; s < 3; s++) starStr += s < starCount ? '\u2605' : '\u2606'
-        this.pageContainer.add(this.add.text(x, y + 48, starStr, {
-          fontSize: '11px', color: '#f1c40f', stroke: '#000', strokeThickness: 1,
-        }).setOrigin(0.5))
-      } else if (i < progress - 1) {
-        this.pageContainer.add(this.add.text(x, y + 48, 'CLEAR', {
-          fontSize: '9px', color: '#2ecc71', fontStyle: 'bold',
+        this.pageContainer.add(this.add.text(x, y + cardH * 0.4, starStr, {
+          fontSize: '9px', color: '#f1c40f', stroke: '#000', strokeThickness: 1,
         }).setOrigin(0.5))
       }
 
-      // Interactive zone
+      // Interactive zone for unlocked levels
       if (unlocked) {
         const zone = this.add.zone(x, y, cardW, cardH).setInteractive({ useHandCursor: true })
         zone.on('pointerdown', () => this.showDifficultyPopup(i, save))
@@ -219,35 +229,41 @@ export class LevelSelectScene extends Phaser.Scene {
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
     container.add(backdrop)
 
-    // Panel
+    // Panel — taller to fit all content
+    const panelW = 300
+    const panelH = 260
     const panel = this.add.graphics()
     panel.fillStyle(0x16213e, 0.95)
-    panel.fillRoundedRect(-140, -100, 280, 210, 10)
+    panel.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 10)
     panel.lineStyle(2, 0xe94560)
-    panel.strokeRoundedRect(-140, -100, 280, 210, 10)
+    panel.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 10)
     container.add(panel)
 
+    // Level name
     const levelName = LEVELS[levelIndex]?.name || `Level ${levelIndex + 1}`
-    container.add(this.add.text(0, -70, levelName, {
-      fontSize: '20px', color: '#fff', fontStyle: 'bold',
+    container.add(this.add.text(0, -panelH / 2 + 20, levelName, {
+      fontSize: '18px', color: '#fff', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5))
 
+    // Difficulty options with proper spacing
     const difficulties = [
-      { key: 'casual', label: 'Casual', color: '#2ecc71', desc: 'More gold, more lives' },
+      { key: 'casual', label: 'Casual', color: '#2ecc71', desc: 'More gold & lives' },
       { key: 'normal', label: 'Normal', color: '#f1c40f', desc: 'Standard challenge' },
-      { key: 'brutal', label: 'Brutal', color: '#e74c3c', desc: 'Less gold, tougher enemies' },
-      { key: 'inferno', label: 'Inferno', color: '#ff4500', desc: 'Minimal gold, 2x enemy HP' },
+      { key: 'brutal', label: 'Brutal', color: '#e74c3c', desc: 'Tough enemies' },
+      { key: 'inferno', label: 'Inferno', color: '#ff4500', desc: '2x enemy HP' },
     ]
 
+    const optionSpacing = 42
+    const firstY = -panelH / 2 + 60
+
     difficulties.forEach((diff, i) => {
-      const y = -30 + i * 30
+      const y = firstY + i * optionSpacing
       const starKey = `${levelIndex}_${diff.key}`
       const stars = save.levelStars[starKey] || 0
-      let starStr = ''
-      for (let s = 0; s < 3; s++) starStr += s < stars ? '\u2605' : '\u2606'
 
-      const btn = this.add.text(-100, y, `${diff.label}  ${starStr}`, {
+      // Difficulty label (left side)
+      const btn = this.add.text(-panelW / 2 + 25, y, diff.label, {
         fontSize: '16px', color: diff.color, fontStyle: 'bold',
       }).setInteractive({ useHandCursor: true })
 
@@ -258,16 +274,34 @@ export class LevelSelectScene extends Phaser.Scene {
       btn.on('pointerout', () => btn.setAlpha(1))
       container.add(btn)
 
-      container.add(this.add.text(100, y + 2, diff.desc, {
-        fontSize: '10px', color: '#888',
+      // Stars (middle)
+      let starStr = ''
+      for (let s = 0; s < 3; s++) starStr += s < stars ? '\u2605' : '\u2606'
+      container.add(this.add.text(40, y + 2, starStr, {
+        fontSize: '12px', color: '#f1c40f',
+      }))
+
+      // Description (right side)
+      container.add(this.add.text(panelW / 2 - 25, y + 3, diff.desc, {
+        fontSize: '9px', color: '#777',
       }).setOrigin(1, 0))
+
+      // Separator line
+      if (i < difficulties.length - 1) {
+        const sep = this.add.graphics()
+        sep.lineStyle(1, 0xffffff, 0.08)
+        sep.lineBetween(-panelW / 2 + 20, y + optionSpacing - 10, panelW / 2 - 20, y + optionSpacing - 10)
+        container.add(sep)
+      }
     })
 
     // Close button
-    const closeBtn = this.add.text(120, -80, 'X', {
-      fontSize: '18px', color: '#888', fontStyle: 'bold',
+    const closeBtn = this.add.text(panelW / 2 - 20, -panelH / 2 + 10, '\u2715', {
+      fontSize: '16px', color: '#888', fontStyle: 'bold',
     }).setInteractive({ useHandCursor: true })
     closeBtn.on('pointerdown', () => container.destroy())
+    closeBtn.on('pointerover', () => closeBtn.setColor('#e94560'))
+    closeBtn.on('pointerout', () => closeBtn.setColor('#888'))
     container.add(closeBtn)
 
     this.diffPopup = container

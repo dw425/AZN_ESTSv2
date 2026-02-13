@@ -11,6 +11,13 @@ export class MenuScene extends Phaser.Scene {
     const cx = w / 2
     const cy = h / 2
 
+    // Clean up on scene shutdown
+    this.events.on('shutdown', () => {
+      this.stopMenuMusic()
+      this.tweens.killAll()
+      this.time.removeAllEvents()
+    })
+
     // Background
     if (this.textures.exists('menu_bg')) {
       const bg = this.add.image(cx, cy, 'menu_bg')
@@ -48,11 +55,10 @@ export class MenuScene extends Phaser.Scene {
     playBtn.on('pointerover', () => playBtn.setTint(0xddaa66))
     playBtn.on('pointerout', () => playBtn.clearTint())
     playBtn.on('pointerdown', () => {
-      this.stopMenuMusic()
       this.scene.start('LevelSelectScene')
     })
 
-    // Start menu music
+    // Start menu music (only if not already playing)
     this.startMenuMusic()
 
     // Stats button
@@ -63,7 +69,6 @@ export class MenuScene extends Phaser.Scene {
     statsBtn.on('pointerover', () => statsBtn.setColor('#fff'))
     statsBtn.on('pointerout', () => statsBtn.setColor('#f1c40f'))
     statsBtn.on('pointerdown', () => {
-      this.stopMenuMusic()
       this.scene.start('StatsScene')
     })
 
@@ -85,6 +90,14 @@ export class MenuScene extends Phaser.Scene {
 
   startMenuMusic() {
     try {
+      // Check if music is already playing globally to prevent duplicates
+      const existing = this.sound.get('music_menu')
+      if (existing && existing.isPlaying) {
+        this.menuMusic = existing
+        return
+      }
+      // Stop any other music that might be playing
+      this.sound.stopAll()
       if (this.cache.audio.exists('music_menu')) {
         this.menuMusic = this.sound.add('music_menu', { loop: true, volume: 0.3 })
         this.menuMusic.play()
@@ -93,8 +106,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   stopMenuMusic() {
-    if (this.menuMusic && this.menuMusic.isPlaying) {
-      this.menuMusic.stop()
-    }
+    try {
+      this.sound.stopAll()
+    } catch (e) { /* ignore */ }
   }
 }

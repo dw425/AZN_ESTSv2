@@ -13,6 +13,12 @@ export class StatsScene extends Phaser.Scene {
     const cx = w / 2
     const save = loadSave()
 
+    // Clean up on scene shutdown
+    this.events.on('shutdown', () => {
+      this.tweens.killAll()
+      this.time.removeAllEvents()
+    })
+
     // Background
     if (this.textures.exists('loading_bg')) {
       const bg = this.add.image(cx, h / 2, 'loading_bg')
@@ -105,7 +111,7 @@ export class StatsScene extends Phaser.Scene {
         this.add.text(panelX + 25, pbY + 25 + i * 22, `${name}`, {
           fontSize: '12px', color: '#aaa',
         })
-        this.add.text(panelX + 375, pbY + 25 + i * 22, `${score.score || score} pts`, {
+        this.add.text(panelX + 375, pbY + 25 + i * 22, `${score.score ?? 0} pts`, {
           fontSize: '12px', color: '#f1c40f', fontStyle: 'bold',
         }).setOrigin(1, 0)
       })

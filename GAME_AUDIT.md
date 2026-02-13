@@ -1,774 +1,349 @@
-# Towers N' Trolls — Complete Game Audit & Feature Inventory
+# Towers N' Trolls Web Edition — Full Game Audit & Fix Tracker
 
-> **Purpose**: Comprehensive catalog of every game element, mechanic, and feature from the original Towers N' Trolls (Ember Entertainment, v1.6.6 APK). Used as the definitive reference for the Phaser.js web rebuild.
-
----
-
-## Table of Contents
-
-1. [Current Implementation Status](#1-current-implementation-status)
-2. [Worlds & Levels](#2-worlds--levels)
-3. [Tower System](#3-tower-system)
-4. [Enemy System](#4-enemy-system)
-5. [Combat Mechanics](#5-combat-mechanics)
-6. [Economy & Currency](#6-economy--currency)
-7. [Shop / Upgrade Store](#7-shop--upgrade-store)
-8. [Special Weapons (Deployables)](#8-special-weapons-deployables)
-9. [Rune System](#9-rune-system)
-10. [Game Modes](#10-game-modes)
-11. [Difficulty System](#11-difficulty-system)
-12. [Scoring & Star Rating](#12-scoring--star-rating)
-13. [Map Elements & Overlays](#13-map-elements--overlays)
-14. [UI / HUD System](#14-ui--hud-system)
-15. [Animation System](#15-animation-system)
-16. [Audio System](#16-audio-system)
-17. [Progression & Save System](#17-progression--save-system)
-18. [Assets Inventory](#18-assets-inventory)
-19. [Iteration Plan](#19-iteration-plan)
+**Created**: 2026-02-12 | **Canvas**: 960x640 Phaser.js 3 | **Deploy**: GitHub Pages (dw425/AZN_ESTSv2)
 
 ---
 
-## 1. Current Implementation Status
+## CRITICAL BUGS (from user visual testing)
 
-### What Works
-- [x] 6 tower types (Ballista, Cannon, Catapult, Scout, Storm, Winter)
-- [x] 3 upgrade levels per tower with sprite swaps
-- [x] 10 enemy types with correct sprites
-- [x] 5 playable levels with hand-painted map backgrounds
-- [x] Path-following AI (BFS waypoint system)
-- [x] Tower targeting (closest enemy in range)
-- [x] Splash/AOE damage (Cannon, Catapult)
-- [x] Slow effect (Winter tower)
-- [x] Tower sell mechanic (60% refund)
-- [x] Wave-based spawning with multiple enemy groups per wave
-- [x] Gold economy (earn from kills, spend on towers/upgrades)
-- [x] Lives system (enemies reaching exit cost lives)
-- [x] Victory/Defeat screens with Next/Retry/Menu
-- [x] Level select with unlock progression
-- [x] Game speed controls (1x/2x)
-- [x] Menu → Level Select → Game scene flow
-- [x] Background music (4 tracks)
-- [x] HUD with gold, lives, wave counter
-- [x] Build panel with 6 tower icons
-
-### What's Missing (Priority Order)
-
-| # | Feature | Severity | Iteration |
-|---|---------|----------|-----------|
-| 1 | Gem currency system | Critical | 1 |
-| 2 | Pre-level shop / upgrade store | Critical | 1 |
-| 3 | Tower health & enemy attacks on towers | Critical | 2 |
-| 4 | Special weapons (Powder Keg, Minefield, Poison Gas) | High | 2 |
-| 5 | Star/trophy rating on level completion | High | 3 |
-| 6 | Multiple difficulty levels (Casual/Normal/Brutal) | High | 3 |
-| 7 | Storm tower chain lightning mechanic | High | 4 |
-| 8 | Scout tower stacking damage mechanic | High | 4 |
-| 9 | More levels (currently 5, need 70) | High | 5-6 |
-| 10 | World map organization (14 worlds x 5 levels) | High | 5 |
-| 11 | Rune system (damage/range/speed runes) | Medium | 7 |
-| 12 | Treasure chests & gold mines (in-level) | Medium | 7 |
-| 13 | Challenge mode / Open Field mode | Medium | 8 |
-| 14 | Endless Journey mode | Medium | 8 |
-| 15 | Enemy portraits on wave preview | Low | 9 |
-| 16 | Sound effects | Low | 9 |
-| 17 | Achievements system | Low | 10 |
-| 18 | Tower auto-heal mechanic | Low | 10 |
-| 19 | Pause menu with proper UI | Low | 10 |
-| 20 | Localization support | Low | Future |
+| # | Issue | Root Cause | Status |
+|---|-------|-----------|--------|
+| C1 | Generated fallback textures render as HUGE broken squares (gold_deposit, treasure_chest) | `this.make.graphics().generateTexture()` produces corrupt textures in Phaser 3 | BROKEN |
+| C2 | Castle visual at exit is crude brown rectangles | GameScene.js drawMap() L291-305 uses raw fillRect | BROKEN |
+| C3 | Level select cards overlap, title clipped at top | LevelSelectScene.js card sizing 105x120 too large for 5x4 grid | BROKEN |
+| C4 | Difficulty popup text overlaps with stars and descriptions | LevelSelectScene.js showDifficultyPopup() spacing too tight | BROKEN |
+| C5 | Game freezes/crashes repeatedly | Scene transitions don't clean up; music re-creates on revisit | BROKEN |
+| C6 | Menu causes game to freeze | MenuScene.js creates new music instance every visit | BROKEN |
+| C7 | Back commands don't work | Multiple scenes may have stale references or navigation issues | BROKEN |
+| C8 | Path rendering is wrong / visually broken | Map bg may not align with grid; no path indicators shown | BROKEN |
+| C9 | Gold mine objects render as broken squares | Uses `gold_deposit` generated texture (corrupt) | BROKEN |
+| C10 | Overall level visuals not right | Combination of C1, C2, C8, C9 | BROKEN |
 
 ---
 
-## 2. Worlds & Levels
+## SCREEN-BY-SCREEN CHECKLIST
 
-### World List (from store-6.json)
+### Screen 1: BootScene (Loading)
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 1.1 | Loading bar renders | Red bar fills across center | UNTESTED |
+| 1.2 | All 152 assets load without 404s | No console errors | UNTESTED |
+| 1.3 | generateFallbacks() creates valid textures | Small colored shapes, not huge broken squares | BROKEN |
+| 1.4 | createAnimations() registers all anims | 13 tower + 8 creep anims created | UNTESTED |
+| 1.5 | Transitions to MenuScene on complete | Automatic after create() | UNTESTED |
 
-The APK store data confirms **14 worlds**, each with **5 levels** (World#-Level# format), totaling **70 levels**.
+### Screen 2: MenuScene (Main Menu)
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 2.1 | Background image (menu_bg) | Full-screen frontEndFrame_android.jpg | UNTESTED |
+| 2.2 | Title logo (title_logo) | TitleLogo_android.png centered, scaled 0.5 | UNTESTED |
+| 2.3 | PLAY button uses wood_button | woodPanelButton.png, 180x55 | UNTESTED |
+| 2.4 | PLAY text overlaid on button | White "PLAY" centered on wood button | UNTESTED |
+| 2.5 | PLAY hover tint | Golden tint on hover | UNTESTED |
+| 2.6 | PLAY navigates to LevelSelect | Clean scene transition, no freeze | BROKEN |
+| 2.7 | STATS button works | Navigates to StatsScene | UNTESTED |
+| 2.8 | Menu music plays (music_menu) | Loops at 0.3 vol, ONE instance only | BROKEN |
+| 2.9 | Music stops on scene exit | No overlapping music | BROKEN |
+| 2.10 | No freeze on repeated visits | Enter/exit menu 5+ times without crash | BROKEN |
+| 2.11 | Credits + version text visible | Bottom of screen | UNTESTED |
 
-| World # | Name | Map Background | Theme | Status |
-|---------|------|---------------|-------|--------|
-| 1 | Lonely Forest | `grass_grnd.jpg` | Woodland/green | Implemented (1 level) |
-| 2 | Fertile Pastures | `f1_grnd.jpg` / `f1b_grnd.jpg` | Farmland | Implemented (1 level) |
-| 3 | Snowy Forest | `f3_grnd.jpg` | Winter/snow | Implemented (1 level) |
-| 4 | Underworld | `undrwrld_grnd.jpg` | Dark caves | NOT implemented |
-| 5 | Badlands | `desert_grnd.jpg` | Desert/waste | Implemented (1 level) |
-| 6 | The North | `ice_grnd.jpg` | Frozen/glacier | Implemented (1 level) |
-| 7 | Sandy Paradise | `sand_grnd.jpg` | Tropical | NOT implemented |
-| 8 | Dark Night | `f1night.jpg` / `f3night_grnd.jpg` | Night variant | NOT implemented |
-| 9 | Mines of Doom | `mine_grnd.jpg` | Underground mine | NOT implemented |
-| 10 | Lava World | `lava_grnd.jpg` | Volcanic | NOT implemented |
-| 11 | Open Field 1 | Various | Open terrain | NOT implemented |
-| 12 | Endless Journey | Various | Mixed | NOT implemented |
-| 13 | Challenge A | Various | Challenge | NOT implemented |
-| 14 | Challenge B | Various | Challenge | NOT implemented |
+### Screen 3: LevelSelectScene
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 3.1 | Background + overlay | loading_bg tinted + 50% dark overlay | UNTESTED |
+| 3.2 | Title "SELECT LEVEL" | 28px, fully visible, NOT clipped | BROKEN |
+| 3.3 | Gem count display (top right) | Gem icon + count | UNTESTED |
+| 3.4 | Level cards layout (5x4 grid) | Cards don't overlap, proper spacing within 960x640 | BROKEN |
+| 3.5 | Card sizing fits viewport | Cards + gaps fit between title and bottom buttons | BROKEN |
+| 3.6 | map_icon on unlocked cards | Stone tablet image | UNTESTED |
+| 3.7 | map_icon_locked on locked cards | Greyed tablet | UNTESTED |
+| 3.8 | World icons on cards | world_1 through world_12 images | UNTESTED |
+| 3.9 | Level names readable | 11px text below icon | UNTESTED |
+| 3.10 | Stars on completed levels | Gold stars displayed | UNTESTED |
+| 3.11 | Click unlocked level opens popup | Difficulty popup appears centered | UNTESTED |
+| 3.12 | Difficulty popup: no text overlap | 4 options with proper spacing | BROKEN |
+| 3.13 | Difficulty popup: stars per difficulty | Stars shown next to each option | UNTESTED |
+| 3.14 | Difficulty popup: descriptions | Right-aligned, readable | BROKEN |
+| 3.15 | Popup close button works | "X" closes popup | UNTESTED |
+| 3.16 | Pagination arrows work | Navigate between pages | UNTESTED |
+| 3.17 | Page indicator text | "Page 1 / 2" | UNTESTED |
+| 3.18 | Back button to MenuScene | back_button image, works reliably | BROKEN |
+| 3.19 | Shop button to ShopScene | Purple "Shop" text | UNTESTED |
 
-### Level Format
+### Screen 4: ShopScene (Upgrades)
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 4.1 | Background + overlay | loading_bg tinted purple + dark overlay | UNTESTED |
+| 4.2 | Title "UPGRADE SHOP" | 28px purple | UNTESTED |
+| 4.3 | Gem display | Current gem count | UNTESTED |
+| 4.4 | 13 upgrade cards in 3-col grid | Cards fit, no overlap, within 960x640 | UNTESTED |
+| 4.5 | Each card has HUD icon | Icon images render | UNTESTED |
+| 4.6 | Name + description per card | Correct text | UNTESTED |
+| 4.7 | Level indicator | "Lv 0/5" etc. | UNTESTED |
+| 4.8 | Buy button with cost | Purple cost, clickable if affordable | UNTESTED |
+| 4.9 | Purchase deducts gems | Scene refreshes with updated data | UNTESTED |
+| 4.10 | Maxed upgrades show "MAX" | Green MAX label | UNTESTED |
+| 4.11 | Back button to LevelSelect | Works reliably | UNTESTED |
 
-Each level consists of:
-- **Grid**: 15x10 tiles (960/64=15 cols, 640/64=10 rows)
-- **Tile types**: 0=buildable, 1=path, 2=spawn, 3=exit
-- **Wave definitions**: Array of enemy groups with type, count, interval
-- **Starting gold**: Varies per level/difficulty
-- **Lives**: Varies per level/difficulty
-- **Map background**: JPG image key (ground layer)
-- **Map underground**: JPG image key (underground/alternative layer)
-- **Overlay elements**: Water, trees, rocks, decorative objects
+### Screen 5: StatsScene
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 5.1 | Background + overlay | loading_bg tinted + dark overlay | UNTESTED |
+| 5.2 | Title "PLAYER STATS" | 28px gold | UNTESTED |
+| 5.3 | 8 stat rows with separators | Proper layout, readable | UNTESTED |
+| 5.4 | Personal bests section | Top 5 scores (not [object Object]) | FIXED |
+| 5.5 | Back button to MenuScene | Works reliably | UNTESTED |
 
-### Map Background Assets Available in APK
-
-Ground layers: `grass_grnd.jpg`, `f1_grnd.jpg`, `f1b_grnd.jpg`, `f3_grnd.jpg`, `desert_grnd.jpg`, `ice_grnd.jpg`, `F2_Grnd.jpg`, `undrwrld_grnd.jpg`, `sand_grnd.jpg`, `mine_grnd.jpg`, `lava_grnd.jpg`, `f1night.jpg`, `f3night_grnd.jpg`
-
-Underground layers: `grass_ugrnd.jpg`, `f1_ugrnd.jpg`, `f1b_ugrnd.jpg`, `f3_ugrnd.jpg`, `desert_ugrnd.jpg`, `ice_ugrnd.jpg`, `F2_UGrnd.jpg`, `undrwrld_ugrnd.jpg`, `sand_ugrnd.jpg`, `mine_ugrnd.jpg`, `lava_ugrnd.jpg`, `f1night_under.jpg`, `f3night_ugrnd.jpg`
-
----
-
-## 3. Tower System
-
-### Tower Types
-
-| Tower | Role | Cost | Base DMG | Range | Fire Rate | Special |
-|-------|------|------|----------|-------|-----------|---------|
-| **Ballista** | All-around | 50 | 20 | 160 | 800ms | Single target |
-| **Cannon** | Short-range AOE | 100 | 60 | 110 | 2000ms | Splash 50px |
-| **Catapult** | Long-range AOE | 120 | 80 | 180 | 2500ms | Splash 70px |
-| **Scout** | Sniper | 40 | 12 | 140 | 500ms | **Stacking damage** (MISSING) |
-| **Storm** | Chain lightning | 80 | 35 | 130 | 1200ms | **Chain hit** (MISSING) |
-| **Winter/Ice** | Crowd control | 70 | 10 | 130 | 1000ms | Slow 50%, 1.5s |
-
-### Upgrade Tiers (Current Implementation)
-
-Each tower has 2 upgrade levels (3 total tiers). Stats increase for damage, range, fire rate, and special effects.
-
-### Tower Health System (MISSING)
-
-In the original game:
-- **Towers have HP** (not yet implemented)
-- **Enemies attack towers** as they pass by, dealing damage
-- **Towers can be destroyed** if HP reaches 0
-- **Tower auto-heal** is a shop upgrade (heals X HP/sec)
-- **Tower health boost** increases max HP
-
-From `tweaks.ini`:
-```
-Towers.Boost.HealthHpPct = (0.2)        # +20% HP per boost level
-Towers.Boost.HealthHpPct2 = (0.1)       # secondary scaling
-Towers.Boost.AutoHealHpPerSec = (0.5)   # heal 0.5 HP/sec per boost
-Towers.Boost.AutoHealHpPerSec2 = (0.3)  # secondary scaling
-```
-
-### Scout Tower Stacking Mechanic (MISSING)
-
-- Each consecutive shot at the **same target** deals increasing damage
-- Resets when switching targets
-- Makes Scout ideal for boss enemies
-
-### Storm Tower Chain Mechanic (MISSING)
-
-- Lightning hits a **chain of enemies in a line** extending beyond targeting range
-- Should hit 3-5 enemies in sequence with damage falloff
-- Current implementation: single-target only
-
-### Tower Animation States (from .anim files)
-
-| Tower | States | Frames per state |
-|-------|--------|-----------------|
-| Ballista L1 | `fire` | 5 sub-states, 160 frames |
-| Cannon L1 | `fire` | 5 sub-states, 160 frames |
-| Catapult L1 | `fire` | 11 sub-states, 352 frames |
-| Scout L1 | `fire` | 1 frame (static) |
-| Storm L1 | `idle` | 30 frames |
-| Winter L1 | `idle` | 30 frames |
-
----
-
-## 4. Enemy System
-
-### Enemy Types
-
-| Enemy | HP | Speed | Reward | DMG to Base | Special |
-|-------|-----|-------|--------|-------------|---------|
-| **Slime** | 30 | 70 | 5 | 1 | **Splits into 3 baby slimes on death** |
-| **Goblin** | 50 | 130 | 8 | 1 | Travels in large packs |
-| **Troll** | 100 | 80 | 12 | 1 | **Health regeneration** |
-| **Orc** | 150 | 75 | 15 | 1 | "Dumb, Strong, Mean" |
-| **Ogre** | 300 | 50 | 25 | 2 | Single-eye Cyclops tank |
-| **Gel Cube** | 200 | 60 | 18 | 1 | **Damages towers as it slides past** |
-| **Rocket Goblin** | 60 | 160 | 10 | 1 | **Kamikaze — damages towers on contact** |
-| **Beholder** | 400 | 45 | 30 | 2 | **Floats over mines** (immune) |
-| **Giant** | 600 | 35 | 40 | 3 | Boss — has **melee attack animation** |
-| **Dragon** | 800 | 55 | 50 | 3 | Final boss |
-
-### Named Bosses (from DerivedMap strings)
-- **Xantem the Eye** — Beholder boss
-- **Gronk the Brutilator** — Ogre/Giant boss
-- **Gronk Senior** — Boss variant
-- **Ainamarth the Dragon** — Dragon boss
-
-### Enemy Animation States (from .anim files)
-
-All enemies have directional movement and death animations:
-
-| Enemy | Movement | Deaths | Total Frames |
-|-------|----------|--------|-------------|
-| Slime | run_down/up/left/right (32f ea) | death1 (44f), death2 (44f) x4 dirs | 608 |
-| Goblin | run x4 dirs | death1, death2 x4 dirs | ~500 |
-| Troll | run x4 dirs (24f) | death1 (28f), death2 (19f) x4 dirs | 284 |
-| Orc | run x4 dirs (19f) | death1 (68f), death2 (48f) x4 dirs | 540 |
-| Ogre | run x4 dirs (24f) | death1 (39f), death2 (31f) x4 dirs | 376 |
-| Gel Cube | run x4 dirs (27f) | death1 x4 dirs (32f) | 236 |
-| Dragon | run x4 dirs | death x4 dirs | ~300 |
-| Giant | run x4 dirs | death x4 dirs | ~300 |
-| Beholder | run x4 dirs | death x4 dirs | ~300 |
-| Rocket Goblin | run x4 dirs | death x4 dirs | ~300 |
-
-### Enemy Attacks on Towers (MISSING)
-
-- Enemies deal damage to towers within melee range as they pass
-- This adds strategic urgency — can't just build towers directly on path edges
-- Some enemy types deal more tower damage than others
+### Screen 6: GameScene (Gameplay)
+| # | Element | Expected | Status |
+|---|---------|----------|--------|
+| 6.1 | Map background | Full-screen map texture, crisp | UNTESTED |
+| 6.2 | Spawn portal | Green glowing ring with pulse | UNTESTED |
+| 6.3 | Base castle at exit | Clean visual, NOT crude rectangles | BROKEN |
+| 6.4 | Rune tiles | 28x28 hud_rune_* icons with type letter | UNTESTED |
+| 6.5 | Gold deposits | Small clean icon, NOT broken square | BROKEN |
+| 6.6 | Treasure chests | Small clean icon, NOT broken square | BROKEN |
+| 6.7 | HUD bar (top) | Black bar: gold/lives/wave/gems/kills | UNTESTED |
+| 6.8 | HUD icons render | Gold, health, gem sprites | UNTESTED |
+| 6.9 | Speed controls | Play/FF/Pause buttons with HUD icons | UNTESTED |
+| 6.10 | Menu button | Top-right, opens pause menu | UNTESTED |
+| 6.11 | Build panel (bottom) | 6 tower icons with names/costs | UNTESTED |
+| 6.12 | Tower icons | hud_ballista through hud_wizard | UNTESTED |
+| 6.13 | Weapon bar | Keg/Mine/Gas with charge counts | UNTESTED |
+| 6.14 | Start Wave button | Centered, clickable, updates per wave | UNTESTED |
+| 6.15 | Tower placement | Click cell -> tower appears with pop animation | UNTESTED |
+| 6.16 | Tower sprites per type/level | Correct texture swaps on upgrade | UNTESTED |
+| 6.17 | Tower fire animation | Sprite frame anim plays on shot | UNTESTED |
+| 6.18 | Tower menu (click tower) | Upgrade/Repair/Sell + icons | UNTESTED |
+| 6.19 | Range indicator | Circle around selected tower | UNTESTED |
+| 6.20 | Cell hover indicator | Green glow / red X | UNTESTED |
+| 6.21 | Enemy spawning | Enemies appear at portal | UNTESTED |
+| 6.22 | Enemy sprites | Correct per type | UNTESTED |
+| 6.23 | Enemy walk animation | Animated for types with frames | UNTESTED |
+| 6.24 | Enemy HP bars | Small bars, update on damage | UNTESTED |
+| 6.25 | Enemy path following | Smooth waypoint movement | UNTESTED |
+| 6.26 | Projectile rendering | Small 10x10 sprites | UNTESTED |
+| 6.27 | Projectile tracking | Follow target enemy | UNTESTED |
+| 6.28 | Damage numbers | Float up and fade | UNTESTED |
+| 6.29 | Splash damage visual | Circle explosion | UNTESTED |
+| 6.30 | Ice slow effect | Blue tint on slowed enemies | UNTESTED |
+| 6.31 | Chain lightning (storm) | Purple lines between chained enemies | UNTESTED |
+| 6.32 | Gem drops | Small gem sprites from killed enemies | UNTESTED |
+| 6.33 | Gem collection | Click or auto-collect | UNTESTED |
+| 6.34 | Gold deposit mining | Build adjacent -> +50 gold, sprite removed | UNTESTED |
+| 6.35 | Chest opening | Build adjacent -> +75 gold, sprite removed | UNTESTED |
+| 6.36 | Boss wave warning | Red text "BOSS APPROACHES!" | UNTESTED |
+| 6.37 | Boss name plate | Red text above boss sprite | UNTESTED |
+| 6.38 | Death effect particles | Burst on enemy death | UNTESTED |
+| 6.39 | Slime splitting | Baby slimes spawn | UNTESTED |
+| 6.40 | Wave countdown | Auto-start timer, early-start bonus | UNTESTED |
+| 6.41 | Pause menu | Overlay with Resume/Restart/Quit | UNTESTED |
+| 6.42 | Victory screen | Green "VICTORY!" + stars + stats + buttons | UNTESTED |
+| 6.43 | Defeat screen | Red "DEFEAT" + quote + stats + buttons | UNTESTED |
+| 6.44 | Victory/Defeat buttons work | Menu, Next, Retry all navigate correctly | UNTESTED |
+| 6.45 | Music plays | Level-appropriate track | UNTESTED |
+| 6.46 | SFX play | Tower fire, coin, explosion sounds | UNTESTED |
+| 6.47 | Tutorial popups | Slide in/out notifications | UNTESTED |
+| 6.48 | No crash after 3+ levels | Memory stable, no freezes | BROKEN |
 
 ---
 
-## 5. Combat Mechanics
+## GENERATED FALLBACK TEXTURES (ROOT CAUSE OF VISUAL BUGS)
 
-### Targeting
-- **Current**: Closest enemy in range (correct)
-- **Missing**: No priority targeting options
+Created in `BootScene.generateFallbacks()` using `this.make.graphics()`:
 
-### Damage Types
-- **Single target**: Ballista, Scout
-- **Splash/AOE**: Cannon (50-80px), Catapult (70-100px)
-- **Chain**: Storm (MISSING — should hit line of enemies)
-- **Slow**: Winter (speed * 0.5 for 1.5-2.5s)
+| Key | Size | Used By | Problem |
+|-----|------|---------|---------|
+| projectile_default | 8x8 | Projectile fallback | May render oversized |
+| proj_ice | 8x8 | Winter tower projectile | May render oversized |
+| proj_storm | 8x8 | Storm tower projectile | May render oversized |
+| range_indicator | 200x200 | Tower range circle | Should use hud_range asset instead |
+| button | 200x50 | Fallback only | Only used if wood_button fails to load |
+| rune_damage | 32x32 | NEVER USED | Code uses hud_rune_damage — DELETE |
+| rune_speed | 32x32 | NEVER USED | Code uses hud_rune_speed — DELETE |
+| rune_range | 32x32 | NEVER USED | Code uses hud_rune_range — DELETE |
+| gold_deposit | 32x32 | drawMap() deposits | RENDERS AS HUGE BROKEN SQUARE |
+| treasure_chest | 32x32 | drawMap() chests | RENDERS AS HUGE BROKEN SQUARE |
 
-### Projectile System
-- Projectiles track their target position
-- Homing — follow target if still alive
-- On hit: deal damage, check splash, apply slow
-- **Missing**: Visual projectile variety (all use same sprite currently)
-
-### Projectile Assets Available in APK (24 total)
-
-| Tower | Projectile Assets | Impact Assets |
-|-------|------------------|---------------|
-| Ballista L1-L3 | `ballista1/2/3_projectile` | None |
-| Cannon L1-L3 | `cannon1/2/3_projectile` | `cannon1/2/3_impact` |
-| Catapult L1-L3 | `catapult1/2/3_projectile` | `catapult1/2/3_impact` |
-| Scout L2-L3 | `scout2/3_projectile` | None (L1 may be hitscan) |
-| Storm | `storm1_projectile` | None (lightning visual) |
-| Winter L1-L3 | `winter1/2/3_projectile` | `winter1/2_impact` |
-
-### Tower Boost System (from tweaks.ini)
-
-| Boost | Effect per Level | Max Levels |
-|-------|-----------------|------------|
-| Damage | +3% HP damage | 20 |
-| Fire Rate | +3% speed | 20 |
-| Range | +5% distance | 20 |
-| AOE | +5% splash radius | 5 |
-| Ice Slow | +3% slow strength | 5 |
-| Health | +20% tower HP | 5 |
-| Auto-Heal | +0.5 HP/sec | 5 |
+**FIX**: Remove gold_deposit, treasure_chest, rune_* generated textures entirely. Use inline graphics only. Use hud_range (rangeindicator.png) for range circle.
 
 ---
 
-## 6. Economy & Currency
+## 20-ITERATION FIX PLAN
 
-### Gold (In-Level Currency)
-- **Earned**: Enemy kills (5-50 gold based on type)
-- **Spent**: Tower placement, tower upgrades
-- **Starting gold**: Varies by level (200-350 in current levels)
-- **Tower sell refund**: 60% of original cost
+### Iteration 1: Remove broken generated textures
+- Delete gold_deposit, treasure_chest, rune_* from generateFallbacks()
+- Change drawMap() to always use inline graphics for deposits/chests (remove textures.exists checks)
+- Use hud_range asset for range indicator instead of generated range_indicator
+- Verify projectile fallback textures are small (8x8)
+- Build + deploy
 
-### Gems (Premium/Persistent Currency) — MISSING
+### Iteration 2: Fix castle visual at exit
+- Replace crude fillRect castle with clean minimal design
+- Use hud_health or unicode shield with proper styling
+- Keep it small and unobtrusive
+- Build + deploy
 
-In the original game:
-- **Gems drop from slain enemies** — must be tapped/swiped to collect
-- **Gems persist across levels** (saved to profile)
-- **Used to**: Unlock worlds, buy upgrades in shop, buy special weapon charges
-- **Gem multiplier (x2)**: Permanent upgrade doubles gem earnings
+### Iteration 3: Fix LevelSelectScene layout — card sizing
+- Reduce card dimensions and gap to fit 5x4 within viewport
+- Ensure margins: top ~65px (title), bottom ~70px (buttons), sides ~55px (arrows)
+- Calculate proper cardW/cardH/gap from available space
+- Build + deploy
 
-### Gem Packs (from store-6.json)
+### Iteration 4: Fix LevelSelectScene — title and text
+- Ensure "SELECT LEVEL" title is fully visible (not clipped)
+- Fix font sizes for readability
+- Build + deploy
 
-| Pack | Gems | Original Price |
-|------|------|---------------|
-| Booster | 500 | $0.99 |
-| Value | 1,000 | $1.99 |
-| Ultra | 2,750 | $4.99 |
-| Mega | 6,000 | $9.99 |
-| Insanity | 15,000 | $19.99 |
-| Dragon's Horde | 35,000 | $29.99 |
+### Iteration 5: Fix difficulty popup layout
+- Increase popup panel size
+- Fix spacing between difficulty options (currently 30px, too tight)
+- Ensure stars don't overlap labels
+- Ensure descriptions don't overlap labels
+- Build + deploy
 
-> **Web version**: Gems will be earned through gameplay only (no real purchases). Starting gem balance = 500.
+### Iteration 6: Fix music management (prevent freezes)
+- MenuScene: check if music already exists before creating new instance
+- GameScene: stop all sounds in scene shutdown handler
+- All scenes: add proper this.events.on('shutdown') cleanup
+- Prevent duplicate audio objects accumulating
+- Build + deploy
 
----
+### Iteration 7: Fix scene transitions and back buttons
+- Verify all back buttons navigate correctly
+- Add scene shutdown event handlers to clean up containers, tweens, timers
+- Test full navigation cycle: Menu -> LevelSelect -> Game -> Pause -> Quit -> LevelSelect -> Menu
+- Build + deploy
 
-## 7. Shop / Upgrade Store — MISSING
+### Iteration 8: Fix path rendering and map alignment
+- Verify BFS pathfinding produces valid waypoints for all 32 levels
+- Ensure spawn (2) and exit (3) tiles are correctly found
+- Verify map backgrounds display correctly with grid alignment
+- Build + deploy
 
-### Store Categories (from store-6.json)
+### Iteration 9: Validate all 32 level grids
+- Confirm each level has exactly 1 spawn and 1 exit
+- Confirm paths are connected (BFS reaches exit from spawn)
+- Confirm special tiles (4-8) are on non-path, non-buildable cells
+- Fix any broken level grids
+- Build + deploy
 
-#### 1. Gem Store (`gemsStore`)
-Web version: Skip (no real money purchases)
+### Iteration 10: Validate tower mechanics
+- All 6 tower types place correctly with sprites
+- Upgrade menu shows correct costs, swaps textures on upgrade
+- Sell returns 60% gold
+- Repair costs and heals correctly
+- Fire animations play for all towers with animation frames
+- Build + deploy
 
-#### 2. World Store (`worldsStore`)
-- Unlock worlds with 500 gems each
-- World 1 & 2 are free (initPurchases: 1)
-- "All Worlds Pack" unlocks everything
-- "Endless Journey" mode costs 500 gems
-- **Web version**: First 6 worlds free, remaining unlock with earned gems
+### Iteration 11: Validate enemy mechanics
+- All 13 enemy types spawn with correct sprites and sizes
+- Walk animations play for types with frames
+- HP bars render and update correctly
+- Special abilities: split (slime), regen (troll), tower-damage (gelcube), fly (beholder), kamikaze (rocketgoblin), melee (ogre/giant)
+- Build + deploy
 
-#### 3. Upgrade Store (`upgradesStore`) — THE PRE-LEVEL SHOP
+### Iteration 12: Validate weapons, HUD, and speed controls
+- Powder keg, mine, gas cloud deploy correctly
+- Charges decrement, visual effects render
+- HUD gold/lives/wave/gems/kills update in real-time
+- Speed controls (1x/2x/pause) work
+- Menu button opens pause overlay
+- Build + deploy
 
-| Upgrade | Gem Cost | +Cost/Level | Max Levels | Effect |
-|---------|----------|-------------|------------|--------|
-| Gold Start Boost | 200 | +400 | 20 | More starting gold |
-| Gold Wave Boost | 100 | +200 | 20 | More gold per wave clear |
-| Base Health Boost | 400 | +200 | 5 | More lives |
-| Tower Auto-Heal | 100 | +25 | 5 | Towers heal HP over time |
-| Tower Health | 100 | +25 | 5 | Increased tower max HP |
-| Tower Damage | 100 | +25 | 20 | +3% damage |
-| Tower Fire Rate | 100 | +25 | 20 | +3% fire rate |
-| Tower Range | 100 | +25 | 20 | +5% range |
-| Tower Ice Slow | 100 | +25 | 5 | +3% slow effect |
-| Tower AOE | 100 | +25 | 5 | +5% splash radius |
-| Mine Boost | 100 | +25 | 10 | +mine charges |
-| Powder Keg Boost | 100 | +25 | 10 | +keg charges |
-| Gas Cloud Boost | 100 | +25 | 10 | +gas charges |
+### Iteration 13: Validate victory/defeat screens
+- Victory: stars + stats + gem count + difficulty badge
+- Defeat: quote + stats
+- Buttons: Menu, Next (if won + more levels), Retry all navigate correctly
+- Gems saved on victory
+- Stars saved per difficulty
+- Build + deploy
 
-#### 4. Skip Passes Store (`skipPassesStore`)
-- Bronze/Gold/Platinum skip tickets to bypass levels
-- **Web version**: Not needed (all levels playable)
+### Iteration 14: Validate ShopScene
+- All 13 upgrades display with correct icons
+- Purchase deducts gems and scene refreshes
+- Maxed upgrades show MAX
+- Back button returns to LevelSelect
+- Build + deploy
 
----
+### Iteration 15: Validate StatsScene
+- 8 stat rows show correct values
+- Personal bests render correctly
+- Back button works
+- Build + deploy
 
-## 8. Special Weapons (Deployables) — MISSING
+### Iteration 16: Validate save/load persistence
+- Level unlock persists across page reloads
+- Stars persist per difficulty
+- Gems persist
+- Upgrades persist
+- Total kills and gems earned track correctly
+- Build + deploy
 
-### Weapon Types
+### Iteration 17: Validate bonus missions
+- All 20 mission check conditions fire correctly
+- Completed missions saved to localStorage
+- Build + deploy
 
-| Weapon | Source File | Effect | Mechanic |
-|--------|-----------|--------|----------|
-| **Minefield** | `loot/minefield-0.pvr` + `.anim` | Damage area on path | Placed on path, explodes when enemies walk over |
-| **Powder Keg** | `loot/powderkeg-0.pvr` + `.anim` | Massive AOE damage | Dragged and dropped onto enemies |
-| **Poison Gas** | `loot/poisongas-0.png` + `.anim` | DOT damage area | Placed on path, damages over time |
+### Iteration 18: Validate tutorials
+- 18 tutorial triggers fire at correct game moments
+- Popups slide in/out without errors or crashes
+- Already-seen tutorials don't repeat
+- Build + deploy
 
-### Mechanic
-- Limited charges per level (default: 1-2 each)
-- More charges purchasable via gem shop (up to 10 levels of boost)
-- Activated via HUD buttons, then drag-to-place on map
-- Cooldown between uses
+### Iteration 19: Performance and stability
+- Play 3+ levels in sequence without crash
+- No memory leaks from destroyed scenes
+- Tweens and timers cleaned up on scene exit
+- No console errors during normal gameplay
+- Build + deploy
 
-### Loot/Collectible Items (from `img/loot/`)
-- `chest1.tga`, `chest2.tga` — Treasure chests (in-level bonus gold)
-- `gem_1.tga` through `gem_5.tga` — 5 gem types (currency drops)
-- `gold.tga` — Gold coin drop
-- `heart.tga` — Life/health pickup
-- `spinnyCoin1` — Animated spinning coin (PVR with .anim)
-
----
-
-## 9. Rune System — MISSING
-
-### Rune Types (from map assets)
-
-| Rune | Map Asset | Effect |
-|------|-----------|--------|
-| **Double Damage** | `maps/runedoubledamage/` | 2x tower damage in radius |
-| **Extend Range** | `maps/runeextendrange/` | Increased tower range in radius |
-| **Fire Faster** | `maps/runefirefaster/` | Increased fire rate in radius |
-
-### Mechanic
-- Runes are **placed on the map** by the player
-- Act as area buffs for nearby towers
-- Limited number per level (typically 1-3)
-- Persist for the entire level once placed
-
----
-
-## 10. Game Modes — MOSTLY MISSING
-
-### Implemented
-- [x] Story Campaign (basic — one difficulty)
-
-### Missing
-- [ ] **Challenge Mode**: Special challenge worlds (Sandy Paradise, Mines of Doom, Lava, Dark Night)
-- [ ] **Open Field Mode**: Open terrain maps with free tower placement
-- [ ] **Endless Journey**: Survive as many waves as possible
-- [ ] **Infinite Mode**: "Last as long as you can"
-- [ ] **Survival Mode**: "One health — how far can you get?"
-
----
-
-## 11. Difficulty System — MISSING
-
-### Difficulty Levels
-- **Casual**: More starting gold, more lives, weaker enemies
-- **Normal**: Standard settings
-- **Brutal**: Less gold, fewer lives, stronger enemies, enemies attack towers harder
-
-Each level can be played on each difficulty. Harder difficulties give better star ratings and more gem rewards.
-
----
-
-## 12. Scoring & Star Rating — MISSING
-
-### Star System
-- 1 star: Completed the level
-- 2 stars: Completed with >50% lives remaining
-- 3 stars: Completed with 100% lives (perfect)
-- Stars are tracked per-level, per-difficulty
-- Trophy for completing all levels in a world with 3 stars
+### Iteration 20: Final visual polish and full deploy
+- All screens look polished and professional
+- No broken textures, no overlapping text
+- All navigation paths work
+- Clean build with no warnings
+- Push to GitHub Pages
+- Verify live site works end-to-end
 
 ---
 
-## 13. Map Elements & Overlays
+## ITERATION LOG
 
-### Tile-Based Elements
-
-| Element | Grid Value | Current Status |
-|---------|-----------|----------------|
-| Buildable grass | 0 | Working |
-| Path | 1 | Working (BFS traced) |
-| Spawn point | 2 | Working |
-| Exit point | 3 | Working |
-| Water overlay | N/A | MISSING |
-| Gold mine | N/A | MISSING |
-| Treasure chest | N/A | MISSING |
-
-### Decorative Overlays (from APK `maps/` directory)
-
-| Category | Assets | Status |
-|----------|--------|--------|
-| Trees | `TDF_TREE_A.png`, `TDF_TREE_B.png`, `f3_treea-c.png`, `palm_a-c.png`, `aspen1/2` | NOT loaded |
-| Rocks | `rocka.png`, `rockb.png`, `rockpile.png`, `desrock.png` | NOT loaded |
-| Water overlays | `grasswater_over.png`, `f2water_over.png`, etc. | NOT loaded |
-| Ice | `icea.png`, `iceb.png` | NOT loaded |
-| Grass | `grassclump/`, `grasspatch/` | NOT loaded |
-| Effects | `lightray/`, `f1sparkles/`, `f1mist/` | NOT loaded |
-| Base/Castle | `base_level_1/`, `base_level_4/`, `base_snow_level_1/4` | NOT loaded |
-| Columns | `column_left.png`, `column_middle.png`, `column_right.png` | NOT loaded |
-| Tower platform | `towerplatform.png` | Loaded but unused |
-| Path brush | `pathBrush.png` | Loaded but unused |
-| Monster generators | `monstergen/`, `monstergensnow/` | NOT loaded |
-| Torch stands | `torchstand/` | NOT loaded |
-| Pond | `pondb/` | NOT loaded |
-| Fire small | `firesmall/` | NOT loaded |
-| Gold deposit | `golddeposit/` | NOT loaded |
-| Mine cloud | `minecloud/` | NOT loaded |
-
-### Base/Castle (at exit point)
-
-The original game shows a castle/base at the exit that enemies are attacking. Assets exist:
-- `base_level_1/` through `base_level_4/` (regular base, animated)
-- `base_snow_level_1/` through `base_snow_level_4/` (snow variant)
+| # | Date | Changes | Build | Status |
+|---|------|---------|-------|--------|
+| 1 | | | | PENDING |
+| 2 | | | | PENDING |
+| 3 | | | | PENDING |
+| 4 | | | | PENDING |
+| 5 | | | | PENDING |
+| 6 | | | | PENDING |
+| 7 | | | | PENDING |
+| 8 | | | | PENDING |
+| 9 | | | | PENDING |
+| 10 | | | | PENDING |
+| 11 | | | | PENDING |
+| 12 | | | | PENDING |
+| 13 | | | | PENDING |
+| 14 | | | | PENDING |
+| 15 | | | | PENDING |
+| 16 | | | | PENDING |
+| 17 | | | | PENDING |
+| 18 | | | | PENDING |
+| 19 | | | | PENDING |
+| 20 | | | | PENDING |
 
 ---
 
-## 14. UI / HUD System
+## ASSET SUMMARY (152 files on disk)
 
-### Top HUD Bar
-- **Current**: Gold, Lives, Wave counter, Speed controls (1x/2x), Menu button
-- **Missing**: Gem counter, Pause button with proper icon, Fast-forward icon
+- **UI**: 19 files (logos, backgrounds, buttons, icons)
+- **HUD**: 26 files (tower/currency/control icons, rune/cell indicators)
+- **Towers**: 46 sprite frames (6 types x 3 levels + animation frames)
+- **Creeps**: 20 sprite frames (10 types + walk animation frames)
+- **Projectiles**: 3 used + 1 unused (temp1.png)
+- **Maps**: 24 textures (ground + underground) + 2 unused (platform, pathBrush)
+- **Music**: 7 tracks
+- **SFX**: 34 sound effects (towers, misc, stingers)
 
-### Available HUD Assets (loaded)
-- `hud_gold`, `hud_gem`, `hud_health` — Currency/stat icons
-- `hud_sell`, `hud_upgrade`, `hud_range` — Tower action icons
-- `hud_ff`, `hud_ff_on` — Fast forward toggle
-- `hud_pause`, `hud_play` — Pause/resume icons
-- `hud_menu` — Menu button icon
-
-### Tower Context Menu
-- **Current**: Text-based popup with Upgrade/Sell
-- **Missing**: Icon-based radial menu (like original), tower HP bar
-
-### Build Panel
-- **Current**: 6 tower icons with name/cost labels at bottom
-- **Missing**: Proper wood-panel styled background, tower availability based on world unlock
-
-### Screens
-- **Menu**: Working (wood button, title logo)
-- **Level Select**: Working (world icons, stone tablets)
-- **Victory**: Basic text overlay — **MISSING** proper victory screen with star rating, gem count
-- **Defeat**: Basic text overlay — **MISSING** proper game over screen with retry/skip options
-- **Pause Menu**: **MISSING** — should slide in/out (`Gui.PauseMenu.SlideInT = 0.3`)
-- **Pre-Level Shop**: **MISSING** — select upgrades before starting
-
-### Available UI Assets
-- `victory_android.jpg` — Victory background
-- `gameover_android.jpg` — Game over background
-- `frontEndFrame_android.jpg` — Menu background
-- `LoadingScreen_android.jpg` — Loading/level select background
-- `TitleLogo_android.png` — Title logo
-- `woodPanelButton.png` — Wood-styled button
-- `mapIcon.png` / `mapIconLocked.png` — Level select cards
-- `World Icon 1-12.png` — World character art
-- `backButton.png` — Back navigation
-
-### Enemy Portraits (for wave preview) — NOT LOADED
-
-| Portrait | File | Enemy |
-|----------|------|-------|
-| `beholder.tga` | TGA format | Beholder |
-| `cube.tga` | TGA format | Gel Cube |
-| `dragon.tga` | TGA format | Dragon |
-| `giant.tga` | TGA format | Giant |
-| `goblin.tga` | TGA format | Goblin |
-| `ogre.tga` | TGA format | Ogre |
-| `orc.tga` | TGA format | Orc |
-| `rocket.tga` | TGA format | Rocket Goblin |
-| `slime.tga` | TGA format | Slime |
-| `troll.tga` | TGA format | Troll |
-
-> Note: TGA files need conversion to PNG for web use
-
----
-
-## 15. Animation System
-
-### Current State
-- **Towers**: Static single-frame sprites (no animation)
-- **Enemies**: Static single-frame sprites (no directional movement, no death animation)
-- **Projectiles**: Static circles/dots
-
-### Original Animation System
-All sprites use `.anim` files that define:
-- Multiple animation states (idle, fire, run_down, run_up, run_left, run_right, death1, death2)
-- Frame coordinates within sprite sheets (page, x, y, w, h)
-- Frame counts and playback timing
-- Sprite sheets stored as PVR (ETC1) or PNG atlas files
-
-### Priority Animations to Implement
-
-1. **Enemy directional movement** (run_down/up/left/right based on path direction)
-2. **Enemy death animations** (death1, death2 variants)
-3. **Tower firing animations** (fire state with multiple frames)
-4. **Tower idle animations** (idle state — subtle movement)
-5. **Projectile impact effects** (explosion for cannon/catapult)
-6. **Gem/gold drop animations** (spinning coin, floating gems)
-
-### Animation Implementation Approach
-
-For web: Extract sprite sheet frames into individual PNGs or use Phaser's sprite sheet system with atlas JSON files. The `.anim` files provide all needed frame coordinate data.
-
----
-
-## 16. Audio System
-
-### Music (Loaded)
-
-| Track | File | World |
-|-------|------|-------|
-| Farm theme | `How it Begins (Farm).mp3` | Lonely Forest, Fertile Pastures |
-| Desert theme | `Dance Monster (Desert).mp3` | Badlands, Sandy Paradise |
-| Glacier theme | `One Sly Move(Glacier).mp3` | Snowy Forest, The North |
-| Gauntlet theme | `Rocket(Gauntlet).mp3` | Challenge modes |
-
-### Sound Effects (NOT loaded — from APK `audio/`)
-
-| Category | Files | Status |
-|----------|-------|--------|
-| Tower shots | `towers/` directory | NOT extracted |
-| Enemy hits | `misc/` directory | NOT extracted |
-| UI clicks | `misc/` directory | NOT extracted |
-| Victory/defeat stingers | `stingers/` directory | NOT extracted |
-| Gem/gold pickup | `misc/` directory | NOT extracted |
-| Wave start | `stingers/` directory | NOT extracted |
-
----
-
-## 17. Progression & Save System
-
-### Current
-- `Phaser.Registry` stores `gameState` with:
-  - `levelsUnlocked`: Number (increments on victory)
-  - `currentLevel`: Number
-  - `gold`, `lives`, `wave`: In-game state
-- No persistence across page reloads
-
-### Original Game
-- Level completion tracked per world
-- Star ratings stored per level per difficulty
-- Gem balance persisted
-- Shop upgrade levels persisted
-- World unlock status persisted
-- Required internet connection for gem saves
-
-### Web Version Target
-- **LocalStorage** for guest saves (immediate)
-- **PostgreSQL** via backend API for logged-in users (future)
-- Save data structure:
-  ```json
-  {
-    "gems": 0,
-    "worldsUnlocked": [1, 2],
-    "levelStars": { "1-1": 3, "1-2": 2 },
-    "upgrades": { "towerDamageBoost": 3, "goldStartBoost": 1 },
-    "specialWeapons": { "mine": 2, "powderKeg": 1, "gasCloud": 1 }
-  }
-  ```
-
----
-
-## 18. Assets Inventory
-
-### Currently Loaded in BootScene.js
-
-| Category | Count | Notes |
-|----------|-------|-------|
-| UI images | 8 | Title, backgrounds, buttons, map icons |
-| World icons | 12 | World 1-12 character art |
-| HUD icons | 12 | Tower icons, currency, controls |
-| Tower sprites | 18 | 6 types x 3 levels |
-| Creep sprites | 10 | One per type |
-| Projectiles | 3 | All using same ballista sprite |
-| Map backgrounds | 7 | grass, f1, f3, ice, desert, platform, path |
-| Music | 4 | Farm, desert, glacier, gauntlet |
-| **Total** | **74** | |
-
-### Available but NOT Loaded
-
-| Category | Count | Notes |
-|----------|-------|-------|
-| Additional map bgs | 8+ | undrwrld, sand, mine, lava, night variants |
-| Map overlays | 30+ | Trees, rocks, water, grass, effects |
-| Base/castle sprites | 4+ | Animated base at different levels |
-| Effect sprites | 3 | lightblue, lightorange, temp1 |
-| Loot sprites | 9+ | Chests, gems, gold, heart, minefield, etc. |
-| Portrait TGAs | 10 | Enemy portraits for wave preview |
-| Rune sprites | 3 | damage, range, fire rate runes |
-| Shop UI | 10+ | Store bar, item buy buttons, gem icons |
-| Sound effects | 20+ | Tower shots, impacts, UI, stingers |
-| **Total available** | **~100+** | |
-
----
-
-## 19. Iteration Plan
-
-### Iteration 1: Gem Economy & Shop System
-**Agent Focus**: Economy specialist
-- Add gem currency to game state
-- Implement gem drops from enemies (tap to collect)
-- Create pre-level shop scene with upgrade categories
-- Add gem counter to HUD
-- Implement persistent upgrades (localStorage save)
-- Wire shop upgrades to affect tower/game stats
-
-### Iteration 2: Tower Health & Special Weapons
-**Agent Focus**: Combat mechanics specialist
-- Add HP property to towers
-- Implement enemy melee attacks on towers within range
-- Add tower HP bars (visible when damaged)
-- Implement tower destruction
-- Add Powder Keg deployable (drag and drop)
-- Add Minefield deployable (place on path)
-- Add Poison Gas deployable (place on path)
-- Add HUD buttons for special weapons
-
-### Iteration 3: Difficulty & Star Rating
-**Agent Focus**: Progression specialist
-- Add difficulty selection to level select (Casual/Normal/Brutal)
-- Scale enemy HP/speed and starting gold per difficulty
-- Implement star rating calculation on level complete
-- Show stars on victory screen
-- Track stars per level in save data
-- Show star count on level select cards
-
-### Iteration 4: Tower Unique Mechanics
-**Agent Focus**: Tower specialist
-- Implement Scout stacking damage (increasing DMG on same target)
-- Implement Storm chain lightning (hit line of enemies)
-- Add visual effects for chain lightning
-- Improve projectile visuals (unique per tower type)
-- Add tower firing animations (extract from .anim sheets)
-- Tune tower balance
-
-### Iteration 5: World Map & More Levels
-**Agent Focus**: Level design specialist
-- Reorganize levels into World#-Level# format
-- Add worlds 4 (Underworld), 7 (Sandy Paradise), 8 (Dark Night)
-- Create level grids for 15+ new levels
-- Design wave compositions with progressive difficulty
-- Load additional map backgrounds (underworld, sand, night)
-- Update level select to show world groupings
-
-### Iteration 6: Even More Levels
-**Agent Focus**: Level design specialist (continued)
-- Add worlds 9 (Mines), 10 (Lava)
-- Create 20+ more level grids
-- Design boss wave compositions
-- Ensure difficulty curve across all worlds
-- Total target: 35+ playable levels
-
-### Iteration 7: Runes & Collectibles
-**Agent Focus**: In-level features specialist
-- Implement rune placement mechanic
-- Add rune effects (damage, range, fire rate buffs in radius)
-- Add treasure chests (build tower adjacent to open)
-- Add gold mines (periodic gold income)
-- Load rune/chest/gold-mine sprites
-- Add visual indicators for buff zones
-
-### Iteration 8: Additional Game Modes
-**Agent Focus**: Game modes specialist
-- Implement Challenge mode (special worlds with unique rules)
-- Implement Open Field mode (free tower placement on open maps)
-- Implement Endless Journey mode (infinite waves, increasing difficulty)
-- Add mode selection to main menu
-- Design special wave generators for endless mode
-
-### Iteration 9: Polish — Audio & Visual
-**Agent Focus**: A/V polish specialist
-- Extract and load sound effects from APK
-- Add tower shot sounds, enemy hit sounds, UI sounds
-- Add enemy directional movement (face direction of travel)
-- Add death animations (fade out or sprite swap)
-- Add enemy portraits to wave preview
-- Victory/defeat screens with proper backgrounds and star display
-
-### Iteration 10: Final Polish & Validation
-**Agent Focus**: QA & validation specialist
-- Full playthrough of all levels on all difficulties
-- Verify tower balance (no tower type is useless or overpowered)
-- Verify economy balance (gems earned vs upgrades cost)
-- Ensure all HUD icons are used properly
-- Test on mobile browsers (touch controls)
-- Performance optimization (object pooling for enemies/projectiles)
-- Pause menu with proper slide-in UI
-- Achievement system (22 achievements from original)
-- Bug fixes from all previous iterations
-
----
-
-## Validation Checklist (Per Iteration)
-
-For each iteration, the validation agent must verify:
-
-- [ ] `npm run build` succeeds with no errors
-- [ ] No console errors on load
-- [ ] All new features are visually correct
-- [ ] No regressions in existing features
-- [ ] Save/load state works correctly
-- [ ] Tower placement still works on all levels
-- [ ] Enemy pathing still works on all levels
-- [ ] Game speed controls (1x/2x) still work
-- [ ] Victory/defeat triggers correctly
-- [ ] Level progression still works
-
----
-
-## Agent Architecture
-
-| Agent | Role | Scope |
-|-------|------|-------|
-| **Economy Agent** | Gem system, shop, pricing | Iteration 1 |
-| **Combat Agent** | Tower HP, enemy attacks, special weapons | Iteration 2 |
-| **Progression Agent** | Difficulty, stars, unlocks | Iteration 3 |
-| **Tower Agent** | Unique mechanics, animations, balance | Iteration 4 |
-| **Level Design Agent** | Map grids, wave compositions | Iterations 5-6 |
-| **Features Agent** | Runes, collectibles, game modes | Iterations 7-8 |
-| **Polish Agent** | Audio, visual effects, animations | Iteration 9 |
-| **QA Agent** | Full validation, bug fixes, performance | Iteration 10 |
-| **Code Review Agent** | Runs after each iteration — reviews all changes | All |
-| **Gameplay Agent** | Tests playability after each iteration | All |
-
----
-
-*Generated from APK v1.6.6 analysis + web research. Last updated: 2026-02-13.*
+All loaded in BootScene.js preload(). No 404s expected.

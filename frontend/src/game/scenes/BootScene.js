@@ -288,71 +288,31 @@ export class BootScene extends Phaser.Scene {
   }
 
   generateFallbacks() {
+    // Only generate small projectile fallbacks — no gold_deposit/treasure_chest/rune textures
+    // (those caused huge broken squares; we use inline graphics instead)
     const proj = this.make.graphics({ add: false })
     proj.fillStyle(0xf1c40f)
     proj.fillCircle(4, 4, 4)
     proj.generateTexture('projectile_default', 8, 8)
+    proj.destroy()
 
     const ice = this.make.graphics({ add: false })
     ice.fillStyle(0x00bcd4)
     ice.fillCircle(4, 4, 4)
     ice.generateTexture('proj_ice', 8, 8)
+    ice.destroy()
 
     const storm = this.make.graphics({ add: false })
     storm.fillStyle(0x9b59b6)
     storm.fillCircle(4, 4, 4)
     storm.generateTexture('proj_storm', 8, 8)
+    storm.destroy()
 
-    // Range indicator
-    const range = this.make.graphics({ add: false })
-    range.lineStyle(1, 0xffffff, 0.3)
-    range.strokeCircle(100, 100, 100)
-    range.fillStyle(0xffffff, 0.05)
-    range.fillCircle(100, 100, 100)
-    range.generateTexture('range_indicator', 200, 200)
-
-    // Button fallback
+    // Button fallback (only used if wood_button asset fails to load)
     const btn = this.make.graphics({ add: false })
     btn.fillStyle(0xe94560)
     btn.fillRoundedRect(0, 0, 200, 50, 10)
     btn.generateTexture('button', 200, 50)
-
-    // Rune fallback textures
-    const runeDmg = this.make.graphics({ add: false })
-    runeDmg.fillStyle(0xe74c3c, 0.8)
-    runeDmg.fillCircle(16, 16, 16)
-    runeDmg.lineStyle(2, 0xff0000)
-    runeDmg.strokeCircle(16, 16, 16)
-    runeDmg.generateTexture('rune_damage', 32, 32)
-
-    const runeSpd = this.make.graphics({ add: false })
-    runeSpd.fillStyle(0x3498db, 0.8)
-    runeSpd.fillCircle(16, 16, 16)
-    runeSpd.lineStyle(2, 0x2980b9)
-    runeSpd.strokeCircle(16, 16, 16)
-    runeSpd.generateTexture('rune_speed', 32, 32)
-
-    const runeRng = this.make.graphics({ add: false })
-    runeRng.fillStyle(0x2ecc71, 0.8)
-    runeRng.fillCircle(16, 16, 16)
-    runeRng.lineStyle(2, 0x27ae60)
-    runeRng.strokeCircle(16, 16, 16)
-    runeRng.generateTexture('rune_range', 32, 32)
-
-    // Gold deposit fallback
-    const goldDep = this.make.graphics({ add: false })
-    goldDep.fillStyle(0xf1c40f, 0.9)
-    goldDep.fillRoundedRect(4, 4, 24, 24, 4)
-    goldDep.lineStyle(2, 0xd4ac0d)
-    goldDep.strokeRoundedRect(4, 4, 24, 24, 4)
-    goldDep.generateTexture('gold_deposit', 32, 32)
-
-    // Chest fallback
-    const chest = this.make.graphics({ add: false })
-    chest.fillStyle(0x8b4513, 0.9)
-    chest.fillRoundedRect(2, 6, 28, 20, 3)
-    chest.fillStyle(0xf1c40f, 0.8)
-    chest.fillRect(13, 10, 6, 8)
-    chest.generateTexture('treasure_chest', 32, 32)
+    btn.destroy()
   }
 }

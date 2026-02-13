@@ -11,6 +11,12 @@ export class ShopScene extends Phaser.Scene {
     const h = this.cameras.main.height
     const cx = w / 2
 
+    // Clean up on scene shutdown
+    this.events.on('shutdown', () => {
+      this.tweens.killAll()
+      this.time.removeAllEvents()
+    })
+
     // Background
     if (this.textures.exists('loading_bg')) {
       const bg = this.add.image(cx, h / 2, 'loading_bg')
