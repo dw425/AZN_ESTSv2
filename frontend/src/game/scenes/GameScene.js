@@ -2856,6 +2856,8 @@ export class GameScene extends Phaser.Scene {
       unlockLevel(this.levelIndex + 1)
       const starKey = `${this.levelIndex}_${this.difficulty}`
       setLevelStars(starKey, stars)
+      // Also save the BEST stars across all difficulties (for level select card display)
+      // setLevelStars() uses Math.max internally, so it won't overwrite better stars
       setLevelStars(this.levelIndex, stars)
     }
 
