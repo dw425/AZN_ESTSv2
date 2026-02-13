@@ -97,6 +97,14 @@ export const TOWER_TYPES = {
 }
 
 // Enemy definitions — based on real Towers N' Trolls creeps
+// Special abilities:
+//   splits: on death, spawns N baby versions (smaller, less HP)
+//   regens: regenerates HP per second
+//   towerDamage: damages towers it passes near (gel cube)
+//   kamikaze: explodes on nearest tower when reaching it
+//   flying: immune to mines, ignores ground traps
+//   melee: extra tower damage in close range
+//   boss: named boss variant, larger sprite
 export const ENEMY_TYPES = {
   slime: {
     name: 'Slime',
@@ -105,6 +113,16 @@ export const ENEMY_TYPES = {
     speed: 70,
     reward: 5,
     damage: 1,
+    splits: 3, // splits into 3 baby slimes on death
+  },
+  slime_baby: {
+    name: 'Baby Slime',
+    texture: 'creep_slime',
+    hp: 10,
+    speed: 90,
+    reward: 2,
+    damage: 1,
+    size: 0.6, // smaller sprite
   },
   goblin: {
     name: 'Goblin',
@@ -121,6 +139,7 @@ export const ENEMY_TYPES = {
     speed: 80,
     reward: 12,
     damage: 1,
+    regens: 3, // regenerates 3 HP per second
   },
   orc: {
     name: 'Orc',
@@ -137,6 +156,7 @@ export const ENEMY_TYPES = {
     speed: 50,
     reward: 25,
     damage: 2,
+    melee: true, // extra tower damage up close
   },
   gelcube: {
     name: 'Gel Cube',
@@ -145,6 +165,7 @@ export const ENEMY_TYPES = {
     speed: 60,
     reward: 18,
     damage: 1,
+    towerDamage: 10, // damages towers it slides past (DPS)
   },
   rocketgoblin: {
     name: 'Rocket Goblin',
@@ -153,6 +174,7 @@ export const ENEMY_TYPES = {
     speed: 160,
     reward: 10,
     damage: 1,
+    kamikaze: true, // explodes on nearest tower for big damage
   },
   beholder: {
     name: 'Beholder',
@@ -161,6 +183,7 @@ export const ENEMY_TYPES = {
     speed: 45,
     reward: 30,
     damage: 2,
+    flying: true, // immune to mines
   },
   giant: {
     name: 'Giant',
@@ -169,6 +192,7 @@ export const ENEMY_TYPES = {
     speed: 35,
     reward: 40,
     damage: 3,
+    melee: true, // strong melee attack on towers
   },
   dragon: {
     name: 'Dragon',
@@ -177,6 +201,41 @@ export const ENEMY_TYPES = {
     speed: 55,
     reward: 50,
     damage: 3,
+    flying: true,
+  },
+  // Boss variants
+  boss_beholder: {
+    name: 'Xantem the Eye',
+    texture: 'creep_beholder',
+    hp: 1200,
+    speed: 35,
+    reward: 100,
+    damage: 4,
+    flying: true,
+    boss: true,
+    size: 1.5,
+  },
+  boss_ogre: {
+    name: 'Gronk the Brutilator',
+    texture: 'creep_ogre',
+    hp: 1500,
+    speed: 30,
+    reward: 120,
+    damage: 5,
+    melee: true,
+    boss: true,
+    size: 1.5,
+  },
+  boss_dragon: {
+    name: 'Ainamarth the Dragon',
+    texture: 'creep_dragon',
+    hp: 2500,
+    speed: 40,
+    reward: 200,
+    damage: 5,
+    flying: true,
+    boss: true,
+    size: 1.8,
   },
 }
 
@@ -320,6 +379,7 @@ export const LEVELS = [
       { enemies: [{ type: 'giant', count: 2, interval: 4000 }, { type: 'gelcube', count: 10, interval: 800 }] },
       { enemies: [{ type: 'dragon', count: 1, interval: 5000 }, { type: 'beholder', count: 4, interval: 2000 }] },
       { enemies: [{ type: 'dragon', count: 2, interval: 3000 }, { type: 'giant', count: 3, interval: 2500 }, { type: 'orc', count: 15, interval: 500 }] },
+      { enemies: [{ type: 'boss_beholder', count: 1, interval: 5000 }, { type: 'beholder', count: 6, interval: 1500 }], boss: true },
     ],
   },
   // === WORLD 1 continued: Lonely Forest ===
@@ -768,6 +828,7 @@ export const LEVELS = [
       { enemies: [{ type: 'dragon', count: 3, interval: 2500 }, { type: 'beholder', count: 6, interval: 1200 }] },
       { enemies: [{ type: 'dragon', count: 4, interval: 2000 }, { type: 'giant', count: 4, interval: 2000 }, { type: 'rocketgoblin', count: 25, interval: 250 }] },
       { enemies: [{ type: 'dragon', count: 6, interval: 1500 }, { type: 'giant', count: 5, interval: 1800 }, { type: 'beholder', count: 8, interval: 1000 }] },
+      { enemies: [{ type: 'boss_dragon', count: 1, interval: 5000 }, { type: 'boss_ogre', count: 1, interval: 5000 }, { type: 'dragon', count: 4, interval: 2000 }], boss: true },
     ],
   },
 ]

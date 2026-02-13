@@ -26,21 +26,18 @@ export class GameScene extends Phaser.Scene {
     this.saveData = loadSave()
     const ups = this.saveData.upgrades
 
-    // Apply gold start boost (+20 gold per level), scaled by difficulty
     this.gold = Math.round((this.levelData.startGold + (ups.goldStartBoost || 0) * 20) * this.diffMult.gold)
-    // Apply base health boost (+1 life per level), scaled by difficulty
     this.lives = Math.round((this.levelData.lives + (ups.baseHealthBoost || 0)) * this.diffMult.lives)
     this.startLives = this.lives
 
     // Store boost multipliers for towers
     this.boosts = {
       damage: 1 + (ups.towerDamageBoost || 0) * 0.03,
-      fireRate: 1 - (ups.towerFireRateBoost || 0) * 0.03, // lower is faster
+      fireRate: 1 - (ups.towerFireRateBoost || 0) * 0.03,
       range: 1 + (ups.towerRangeBoost || 0) * 0.05,
       aoe: 1 + (ups.towerAoeBoost || 0) * 0.05,
       iceSlow: 1 + (ups.towerIcyBoost || 0) * 0.03,
     }
-    // Gold wave bonus
     this.goldWaveBonus = (ups.goldWaveBoost || 0) * 2
 
     this.currentWave = 0
@@ -50,10 +47,13 @@ export class GameScene extends Phaser.Scene {
     this.projectiles = []
     this.gemDrops = []
     this.gemsCollected = 0
+    this.enemiesKilled = 0
     this.selectedTowerType = null
     this.gameOver = false
     this.paused = false
-    this.deployables = [] // Active deployables on the map
+    this.gameSpeed = 1
+    this.deployables = []
+    this.waveCountdown = 0
 
     // Special weapon charges
     this.weaponCharges = {
@@ -61,37 +61,30 @@ export class GameScene extends Phaser.Scene {
       mine: 1 + (ups.mineBoost || 0),
       gas: 1 + (ups.gasCloudBoost || 0),
     }
-    this.activeWeapon = null // Currently selected weapon for placement
+    this.activeWeapon = null
 
     // Build the path waypoints from the grid
     this.waypoints = this.buildPath(this.levelData.grid)
   }
 
   create() {
-    // Draw the map
     this.drawMap()
 
-    // Create groups
     this.enemyGroup = this.add.group()
     this.projectileGroup = this.add.group()
     this.towerGroup = this.add.group()
 
-    // HUD
     this.createHUD()
-
-    // Tower build panel
     this.createBuildPanel()
-
-    // Weapon bar (above build panel)
     this.createWeaponBar()
 
     // Range indicator (hidden by default)
     this.rangeIndicator = this.add.image(0, 0, 'range_indicator').setVisible(false).setAlpha(0.3).setDepth(5)
 
-    // Click handler for placing towers
+    // Click handler
     this.input.on('pointerdown', (pointer) => this.handleClick(pointer))
 
-    // Start wave button (above the build panel)
+    // Start wave button
     this.startWaveBtn = this.add.text(
       this.cameras.main.centerX, this.cameras.main.height - 95,
       '>> START WAVE 1 <<',
@@ -102,15 +95,45 @@ export class GameScene extends Phaser.Scene {
     this.startWaveBtn.on('pointerover', () => this.startWaveBtn.setColor('#fff'))
     this.startWaveBtn.on('pointerout', () => this.startWaveBtn.setColor('#f1c40f'))
 
-    // Save game state to registry for cloud save
+    // Wave countdown text (hidden)
+    this.countdownText = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.height - 95,
+      '', { fontSize: '16px', color: '#aaa', stroke: '#000', strokeThickness: 2 }
+    ).setOrigin(0.5).setDepth(20).setVisible(false)
+
+    // Boss warning text (hidden)
+    this.bossWarning = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.centerY - 30,
+      '', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }
+    ).setOrigin(0.5).setDepth(40).setVisible(false)
+
+    // Start music
+    this.startMusic()
+
     this.updateGameState()
+  }
+
+  startMusic() {
+    const musicKey = this.levelData.music
+    if (!musicKey) return
+    try {
+      if (this.sound.get(musicKey)) {
+        this.bgMusic = this.sound.get(musicKey)
+      } else if (this.cache.audio.exists(musicKey)) {
+        this.bgMusic = this.sound.add(musicKey, { loop: true, volume: 0.3 })
+      }
+      if (this.bgMusic && !this.bgMusic.isPlaying) {
+        this.bgMusic.play()
+      }
+    } catch (e) {
+      // Audio may not be available
+    }
   }
 
   buildPath(grid) {
     const path = []
     let startRow = -1, startCol = -1
 
-    // Find spawn (2)
     for (let r = 0; r < grid.length; r++) {
       for (let c = 0; c < grid[r].length; c++) {
         if (grid[r][c] === 2) {
@@ -122,7 +145,6 @@ export class GameScene extends Phaser.Scene {
       if (startRow >= 0) break
     }
 
-    // BFS to trace path
     const visited = new Set()
     const queue = [[startRow, startCol]]
     visited.add(`${startRow},${startCol}`)
@@ -150,7 +172,6 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Reconstruct path
     const cells = []
     let cur = [endRow, endCol]
     while (cur) {
@@ -159,7 +180,6 @@ export class GameScene extends Phaser.Scene {
       cur = parent[key] || null
     }
 
-    // Convert to pixel positions (center of each tile)
     return cells.map(([r, c]) => ({
       x: c * TILE + TILE / 2,
       y: r * TILE + TILE / 2,
@@ -170,7 +190,6 @@ export class GameScene extends Phaser.Scene {
     const grid = this.levelData.grid
     const bgKey = this.levelData.mapBg || 'map_grass'
 
-    // Draw full background map image — the map art already shows paths/terrain
     if (this.textures.exists(bgKey)) {
       this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, bgKey)
         .setDisplaySize(this.cameras.main.width, this.cameras.main.height)
@@ -180,7 +199,7 @@ export class GameScene extends Phaser.Scene {
       bg.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
     }
 
-    // Find spawn and exit for small arrow indicators
+    // Spawn/exit indicators
     for (let r = 0; r < grid.length; r++) {
       for (let c = 0; c < grid[r].length; c++) {
         const val = grid[r][c]
@@ -188,13 +207,13 @@ export class GameScene extends Phaser.Scene {
         const y = r * TILE + TILE / 2
 
         if (val === 2) {
-          const arrow = this.add.text(x, y, '\u25B6', {
+          this.add.text(x, y, '\u25B6', {
             fontSize: '16px', color: '#2ecc71',
             stroke: '#000', strokeThickness: 3,
           }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
         }
         if (val === 3) {
-          const flag = this.add.text(x, y, '\u2691', {
+          this.add.text(x, y, '\u2691', {
             fontSize: '20px', color: '#e74c3c',
             stroke: '#000', strokeThickness: 3,
           }).setOrigin(0.5).setDepth(2).setAlpha(0.8)
@@ -204,11 +223,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   createHUD() {
+    const w = this.cameras.main.width
     const hudBg = this.add.graphics().setDepth(15)
     hudBg.fillStyle(0x000000, 0.6)
-    hudBg.fillRect(0, 0, this.cameras.main.width, 36)
+    hudBg.fillRect(0, 0, w, 36)
 
-    // Gold icon + text
+    // Gold
     if (this.textures.exists('hud_gold')) {
       this.add.image(18, 18, 'hud_gold').setDisplaySize(20, 20).setDepth(16)
     }
@@ -216,7 +236,7 @@ export class GameScene extends Phaser.Scene {
       fontSize: '16px', color: '#f1c40f', fontStyle: 'bold',
     }).setDepth(16)
 
-    // Lives icon + text
+    // Lives
     if (this.textures.exists('hud_health')) {
       this.add.image(148, 18, 'hud_health').setDisplaySize(20, 20).setDepth(16)
     }
@@ -224,12 +244,12 @@ export class GameScene extends Phaser.Scene {
       fontSize: '16px', color: '#e94560', fontStyle: 'bold',
     }).setDepth(16)
 
-    // Wave text
+    // Wave
     this.waveText = this.add.text(280, 8, '', {
       fontSize: '16px', color: '#3498db', fontStyle: 'bold',
     }).setDepth(16)
 
-    // Gem icon + text
+    // Gems
     if (this.textures.exists('hud_gem')) {
       this.add.image(418, 18, 'hud_gem').setDisplaySize(20, 20).setDepth(16)
     }
@@ -237,24 +257,126 @@ export class GameScene extends Phaser.Scene {
       fontSize: '16px', color: '#9b59b6', fontStyle: 'bold',
     }).setDepth(16)
 
-    // Speed controls
-    this.add.text(this.cameras.main.width - 120, 8, '1x', {
+    // Enemies killed
+    this.killText = this.add.text(520, 8, '', {
       fontSize: '14px', color: '#aaa',
-    }).setDepth(16).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => { this.gameSpeed = 1; this.time.timeScale = 1; this.physics.world.timeScale = 1 })
+    }).setDepth(16)
 
-    this.add.text(this.cameras.main.width - 85, 8, '2x', {
-      fontSize: '14px', color: '#aaa',
-    }).setDepth(16).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => { this.gameSpeed = 2; this.time.timeScale = 2; this.physics.world.timeScale = 0.5 })
+    // Speed controls using HUD icons
+    const speedX = w - 150
+    if (this.textures.exists('hud_play')) {
+      this.playBtn = this.add.image(speedX, 18, 'hud_play')
+        .setDisplaySize(22, 22).setDepth(16)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.setSpeed(1))
+    }
+    if (this.textures.exists('hud_ff')) {
+      this.ffBtn = this.add.image(speedX + 28, 18, 'hud_ff')
+        .setDisplaySize(22, 22).setDepth(16)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.setSpeed(2))
+    }
+    if (this.textures.exists('hud_pause')) {
+      this.pauseBtn = this.add.image(speedX + 56, 18, 'hud_pause')
+        .setDisplaySize(22, 22).setDepth(16)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.togglePause())
+    }
 
-    // Back to menu
-    this.add.text(this.cameras.main.width - 45, 8, 'Menu', {
-      fontSize: '14px', color: '#888',
-    }).setDepth(16).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('LevelSelectScene'))
+    // Menu button
+    if (this.textures.exists('hud_menu')) {
+      this.add.image(w - 25, 18, 'hud_menu')
+        .setDisplaySize(22, 22).setDepth(16)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.showPauseMenu())
+    } else {
+      this.add.text(w - 45, 8, 'Menu', {
+        fontSize: '14px', color: '#888',
+      }).setDepth(16).setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.showPauseMenu())
+    }
 
     this.updateHUD()
+  }
+
+  setSpeed(speed) {
+    this.gameSpeed = speed
+    this.time.timeScale = speed
+    this.physics.world.timeScale = 1 / speed
+    // Update button visuals
+    if (this.ffBtn) {
+      const ffKey = speed === 2 ? 'hud_ff_on' : 'hud_ff'
+      if (this.textures.exists(ffKey)) this.ffBtn.setTexture(ffKey)
+    }
+  }
+
+  togglePause() {
+    this.paused = !this.paused
+    if (this.paused) {
+      this.showPauseMenu()
+    } else if (this.pauseMenu) {
+      this.pauseMenu.destroy()
+      this.pauseMenu = null
+    }
+  }
+
+  showPauseMenu() {
+    if (this.pauseMenu) {
+      this.pauseMenu.destroy()
+      this.pauseMenu = null
+      this.paused = false
+      return
+    }
+    this.paused = true
+
+    const cx = this.cameras.main.centerX
+    const cy = this.cameras.main.centerY
+    const container = this.add.container(cx, cy).setDepth(60)
+
+    // Backdrop
+    const backdrop = this.add.graphics()
+    backdrop.fillStyle(0x000000, 0.7)
+    backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
+    container.add(backdrop)
+
+    // Panel
+    const panel = this.add.graphics()
+    panel.fillStyle(0x16213e, 0.95)
+    panel.fillRoundedRect(-120, -100, 240, 200, 12)
+    panel.lineStyle(2, 0xe94560)
+    panel.strokeRoundedRect(-120, -100, 240, 200, 12)
+    container.add(panel)
+
+    container.add(this.add.text(0, -80, 'PAUSED', {
+      fontSize: '24px', color: '#e94560', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5))
+
+    const buttons = [
+      { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false } },
+      { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty }) } },
+      { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.stopMusic(); this.scene.start('LevelSelectScene') } },
+    ]
+
+    buttons.forEach((btn, i) => {
+      const y = -30 + i * 45
+      const text = this.add.text(0, y, btn.text, {
+        fontSize: '18px', color: btn.color, fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+      text.on('pointerdown', btn.action)
+      text.on('pointerover', () => text.setAlpha(0.7))
+      text.on('pointerout', () => text.setAlpha(1))
+      container.add(text)
+    })
+
+    this.pauseMenu = container
+  }
+
+  stopMusic() {
+    if (this.bgMusic && this.bgMusic.isPlaying) {
+      this.bgMusic.stop()
+    }
   }
 
   createBuildPanel() {
@@ -281,7 +403,6 @@ export class GameScene extends Phaser.Scene {
         fontSize: '9px', color: '#ccc', align: 'center',
       }).setOrigin(0.5, 0).setDepth(16)
 
-      // Selection highlight
       const highlight = this.add.graphics().setDepth(15)
 
       icon.on('pointerdown', () => {
@@ -290,6 +411,8 @@ export class GameScene extends Phaser.Scene {
           this.rangeIndicator.setVisible(false)
         } else {
           this.selectedTowerType = key
+          this.activeWeapon = null
+          this.updateWeaponHighlights()
         }
         this.updateBuildHighlights()
       })
@@ -373,25 +496,18 @@ export class GameScene extends Phaser.Scene {
     const weaponKey = this.activeWeapon
 
     if (weaponKey === 'powderKeg') {
-      // Powder Keg: Instant AOE damage at location
       this.weaponCharges.powderKeg--
       const radius = 80
       const damage = 150
 
-      // Explosion visual
       const boom = this.add.graphics().setDepth(11)
       boom.fillStyle(0xe74c3c, 0.6)
       boom.fillCircle(x, y, radius)
       this.tweens.add({
-        targets: boom,
-        alpha: 0,
-        scaleX: 1.5,
-        scaleY: 1.5,
-        duration: 500,
+        targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 500,
         onComplete: () => boom.destroy(),
       })
 
-      // Damage enemies in radius
       this.enemies.forEach(enemy => {
         if (!enemy.sprite.active) return
         const dx = enemy.sprite.x - x
@@ -402,7 +518,6 @@ export class GameScene extends Phaser.Scene {
       })
 
     } else if (weaponKey === 'mine') {
-      // Mine: Place on path, explodes when enemy walks over
       this.weaponCharges.mine--
       const mine = this.add.graphics().setDepth(3)
       mine.fillStyle(0xf39c12, 0.7)
@@ -412,16 +527,11 @@ export class GameScene extends Phaser.Scene {
       mine.setPosition(x, y)
 
       this.deployables.push({
-        type: 'mine',
-        graphics: mine,
-        x, y,
-        radius: 50,
-        damage: 200,
-        active: true,
+        type: 'mine', graphics: mine, x, y,
+        radius: 50, damage: 200, active: true,
       })
 
     } else if (weaponKey === 'gas') {
-      // Gas: Area DOT at location for 5 seconds
       this.weaponCharges.gas--
       const cloud = this.add.graphics().setDepth(3)
       cloud.fillStyle(0x2ecc71, 0.3)
@@ -429,32 +539,19 @@ export class GameScene extends Phaser.Scene {
       cloud.setPosition(x, y)
 
       const gasObj = {
-        type: 'gas',
-        graphics: cloud,
-        x, y,
-        radius: 60,
-        dps: 30, // damage per second
-        timer: 5000,
-        active: true,
+        type: 'gas', graphics: cloud, x, y,
+        radius: 60, dps: 30, timer: 5000, active: true,
       }
       this.deployables.push(gasObj)
 
-      // Fade out over lifetime
       this.tweens.add({
-        targets: cloud,
-        alpha: 0,
-        duration: 5000,
-        onComplete: () => {
-          cloud.destroy()
-          gasObj.active = false
-        },
+        targets: cloud, alpha: 0, duration: 5000,
+        onComplete: () => { cloud.destroy(); gasObj.active = false },
       })
     }
 
-    // Update button display
     this.activeWeapon = null
     this.updateWeaponHighlights()
-    // Refresh weapon bar text
     Object.entries(this.weaponButtons).forEach(([key, btn]) => {
       const charges = this.weaponCharges[key]
       const symbols = { powderKeg: '\u2620', mine: '\u26A0', gas: '\u2601' }
@@ -467,8 +564,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleClick(pointer) {
-    if (this.gameOver) return
-    // Ignore clicks on HUD areas
+    if (this.gameOver || this.paused) return
     if (pointer.y < 36 || pointer.y > this.cameras.main.height - 80) return
 
     // Deploy weapon if active
@@ -494,7 +590,6 @@ export class GameScene extends Phaser.Scene {
     if (this.selectedTowerType && grid[row][col] === 0) {
       const towerDef = TOWER_TYPES[this.selectedTowerType]
       if (this.gold >= towerDef.cost) {
-        // Check no tower already there
         if (!this.towers.find(t => t.gridCol === col && t.gridRow === row)) {
           this.placeTower(col, row, this.selectedTowerType)
         }
@@ -512,21 +607,14 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add.image(x, y, def.texture).setDisplaySize(40, 40).setDepth(4)
     this.towerGroup.add(sprite)
 
-    // Tower HP: base 100, boosted by shop upgrade
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
-    const baseHp = 100
-    const maxHp = Math.round(baseHp * healthMult)
+    const maxHp = Math.round(100 * healthMult)
 
-    // Tower HP bar (hidden until damaged)
     const hpBg = this.add.graphics().setDepth(5).setVisible(false)
     const hpBar = this.add.graphics().setDepth(5).setVisible(false)
 
     const tower = {
-      sprite,
-      type,
-      gridCol: col,
-      gridRow: row,
-      x, y,
+      sprite, type, gridCol: col, gridRow: row, x, y,
       damage: Math.round(def.damage * this.boosts.damage),
       range: Math.round(def.range * this.boosts.range),
       fireRate: Math.round(def.fireRate * this.boosts.fireRate),
@@ -552,12 +640,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   showTowerMenu(tower) {
-    // Remove existing menu if any
     if (this.towerMenu) this.towerMenu.destroy()
 
     const def = TOWER_TYPES[tower.type]
     const upgrade = def.upgrades[tower.level]
-    const menuItems = []
 
     // Show range
     this.rangeIndicator.setPosition(tower.x, tower.y)
@@ -592,13 +678,10 @@ export class GameScene extends Phaser.Scene {
           if (upgrade.splash) tower.splash = Math.round(upgrade.splash * this.boosts.aoe)
           if (upgrade.slow) tower.slow = Math.min(upgrade.slow * this.boosts.iceSlow, 0.9)
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
-          // Swap tower sprite to upgraded version
-          const towerDef = TOWER_TYPES[tower.type]
-          if (towerDef.textures && towerDef.textures[tower.level]) {
-            const newTex = towerDef.textures[tower.level]
-            if (this.textures.exists(newTex)) {
-              tower.sprite.setTexture(newTex)
-            }
+          // Swap sprite texture
+          if (def.textures && def.textures[tower.level]) {
+            const newTex = def.textures[tower.level]
+            if (this.textures.exists(newTex)) tower.sprite.setTexture(newTex)
           }
           this.updateHUD()
           menu.destroy()
@@ -615,6 +698,8 @@ export class GameScene extends Phaser.Scene {
     sellBtn.on('pointerdown', () => {
       this.gold += sellValue
       tower.sprite.destroy()
+      tower.hpBg.destroy()
+      tower.hpBar.destroy()
       this.towers = this.towers.filter(t => t !== tower)
       this.updateHUD()
       menu.destroy()
@@ -624,7 +709,6 @@ export class GameScene extends Phaser.Scene {
 
     this.towerMenu = menu
 
-    // Auto-close when clicking elsewhere
     this.time.delayedCall(5000, () => {
       if (menu && menu.active) {
         menu.destroy()
@@ -639,18 +723,21 @@ export class GameScene extends Phaser.Scene {
 
     this.waveActive = true
     this.startWaveBtn.setVisible(false)
+    this.countdownText.setVisible(false)
 
     const wave = this.levelData.waves[this.currentWave]
-    let totalSpawned = 0
-    let totalToSpawn = 0
 
-    wave.enemies.forEach(group => {
-      totalToSpawn += group.count
-    })
+    // Boss wave warning
+    if (wave.boss) {
+      this.showBossWarning(wave)
+    }
+
+    let totalToSpawn = 0
+    wave.enemies.forEach(group => { totalToSpawn += group.count })
 
     wave.enemies.forEach(group => {
       const enemyDef = ENEMY_TYPES[group.type]
-      let spawned = 0
+      if (!enemyDef) return
 
       this.time.addEvent({
         delay: group.interval,
@@ -658,8 +745,6 @@ export class GameScene extends Phaser.Scene {
         callback: () => {
           if (this.gameOver) return
           this.spawnEnemy(enemyDef, group.type)
-          spawned++
-          totalSpawned++
         },
       })
     })
@@ -667,31 +752,51 @@ export class GameScene extends Phaser.Scene {
     this.updateHUD()
   }
 
+  showBossWarning(wave) {
+    // Find the boss name
+    let bossName = 'BOSS WAVE'
+    wave.enemies.forEach(group => {
+      const def = ENEMY_TYPES[group.type]
+      if (def && def.boss) bossName = def.name.toUpperCase()
+    })
+
+    this.bossWarning.setText(`\u26A0 ${bossName} APPROACHES! \u26A0`)
+    this.bossWarning.setVisible(true)
+    this.tweens.add({
+      targets: this.bossWarning,
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 0.5, to: 1.2 },
+      scaleY: { from: 0.5, to: 1.2 },
+      duration: 2000,
+      ease: 'Power2',
+      onComplete: () => this.bossWarning.setVisible(false),
+    })
+  }
+
   spawnEnemy(def, type) {
     const start = this.waypoints[0]
+    const spriteSize = def.boss ? 44 : def.size ? Math.round(28 * def.size) : 28
+
     const sprite = this.add.image(start.x, start.y, def.texture)
-      .setDisplaySize(28, 28)
+      .setDisplaySize(spriteSize, spriteSize)
       .setDepth(6)
     this.enemyGroup.add(sprite)
 
-    // HP bar background
-    const hpBg = this.add.graphics().setDepth(7)
-    hpBg.fillStyle(0x333333)
-    hpBg.fillRect(-14, -20, 28, 4)
+    // Boss tint (reddish glow)
+    if (def.boss) {
+      sprite.setTint(0xff6666)
+    }
 
-    // HP bar fill
+    // HP bar
+    const barWidth = Math.max(28, spriteSize)
+    const hpBg = this.add.graphics().setDepth(7)
     const hpBar = this.add.graphics().setDepth(8)
-    hpBar.fillStyle(0x2ecc71)
-    hpBar.fillRect(-14, -20, 28, 4)
 
     const scaledHp = Math.round(def.hp * this.diffMult.enemyHp)
     const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed)
 
     const enemy = {
-      sprite,
-      hpBg,
-      hpBar,
-      type,
+      sprite, hpBg, hpBar, type,
       hp: scaledHp,
       maxHp: scaledHp,
       baseSpeed: scaledSpeed,
@@ -700,6 +805,26 @@ export class GameScene extends Phaser.Scene {
       damage: def.damage,
       waypointIndex: 0,
       slowTimer: 0,
+      barWidth,
+      // Special ability flags
+      splits: def.splits || 0,
+      regens: def.regens || 0,
+      towerDamage: def.towerDamage || 0,
+      kamikaze: def.kamikaze || false,
+      flying: def.flying || false,
+      melee: def.melee || false,
+      boss: def.boss || false,
+      size: def.size || 1,
+      // Boss name plate
+      namePlate: null,
+    }
+
+    // Boss name plate
+    if (def.boss) {
+      enemy.namePlate = this.add.text(start.x, start.y - spriteSize / 2 - 16, def.name, {
+        fontSize: '10px', color: '#e74c3c', fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(9)
     }
 
     this.enemies.push(enemy)
@@ -708,16 +833,25 @@ export class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this.gameOver || this.paused) return
 
+    const speedDelta = delta * this.gameSpeed
+
     // Move enemies
     this.enemies.forEach(enemy => {
       if (!enemy.sprite.active) return
 
       // Handle slow effect
       if (enemy.slowTimer > 0) {
-        enemy.slowTimer -= delta
+        enemy.slowTimer -= speedDelta
         if (enemy.slowTimer <= 0) {
           enemy.speed = enemy.baseSpeed
+          enemy.sprite.clearTint()
+          if (enemy.boss) enemy.sprite.setTint(0xff6666)
         }
+      }
+
+      // Troll regen
+      if (enemy.regens > 0 && enemy.hp < enemy.maxHp) {
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + (enemy.regens * speedDelta) / 1000)
       }
 
       const target = this.waypoints[enemy.waypointIndex]
@@ -730,7 +864,10 @@ export class GameScene extends Phaser.Scene {
       if (dist < 5) {
         enemy.waypointIndex++
         if (enemy.waypointIndex >= this.waypoints.length) {
-          // Enemy reached exit
+          // Kamikaze: explode on nearest tower before exiting
+          if (enemy.kamikaze) {
+            this.kamikazeExplosion(enemy)
+          }
           this.lives -= enemy.damage
           this.removeEnemy(enemy)
           this.updateHUD()
@@ -740,25 +877,40 @@ export class GameScene extends Phaser.Scene {
           return
         }
       } else {
-        const speed = (enemy.speed * delta) / 1000
-        enemy.sprite.x += (dx / dist) * speed
-        enemy.sprite.y += (dy / dist) * speed
+        const speed = (enemy.speed * speedDelta) / 1000
+        const moveX = (dx / dist) * speed
+        const moveY = (dy / dist) * speed
+        enemy.sprite.x += moveX
+        enemy.sprite.y += moveY
+
+        // Flip sprite based on movement direction
+        if (dx < -2) {
+          enemy.sprite.setFlipX(true)
+        } else if (dx > 2) {
+          enemy.sprite.setFlipX(false)
+        }
       }
 
       // Update HP bar position
+      const halfBar = enemy.barWidth / 2
       enemy.hpBg.setPosition(enemy.sprite.x, enemy.sprite.y)
       enemy.hpBar.setPosition(enemy.sprite.x, enemy.sprite.y)
       enemy.hpBg.clear()
       enemy.hpBg.fillStyle(0x333333)
-      enemy.hpBg.fillRect(-14, -20, 28, 4)
+      enemy.hpBg.fillRect(-halfBar, -20, enemy.barWidth, 4)
       enemy.hpBar.clear()
       const hpRatio = enemy.hp / enemy.maxHp
       const color = hpRatio > 0.5 ? 0x2ecc71 : hpRatio > 0.25 ? 0xf39c12 : 0xe74c3c
       enemy.hpBar.fillStyle(color)
-      enemy.hpBar.fillRect(-14, -20, 28 * hpRatio, 4)
+      enemy.hpBar.fillRect(-halfBar, -20, enemy.barWidth * hpRatio, 4)
+
+      // Update boss name plate
+      if (enemy.namePlate) {
+        enemy.namePlate.setPosition(enemy.sprite.x, enemy.sprite.y - enemy.barWidth / 2 - 16)
+      }
     })
 
-    // Enemy melee attacks on towers (enemies damage nearby towers)
+    // Gel Cube tower damage + enemy melee attacks
     this.enemies.forEach(enemy => {
       if (!enemy.sprite.active) return
       this.towers.forEach(tower => {
@@ -766,15 +918,19 @@ export class GameScene extends Phaser.Scene {
         const dx = enemy.sprite.x - tower.x
         const dy = enemy.sprite.y - tower.y
         const dist = Math.sqrt(dx * dx + dy * dy)
-        // Melee range = 1.2 tiles
+
+        // Gel cube special: damages towers it passes near
+        if (enemy.towerDamage > 0 && dist < TILE * 1.5) {
+          tower.hp -= (enemy.towerDamage * speedDelta) / 1000
+          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
+        }
+
+        // Standard melee range (ogre, giant have melee flag for extra damage)
         if (dist < TILE * 1.2) {
-          // Damage tower (scaled by delta for frame-rate independence)
-          const dps = enemy.damage * 5 // 5 damage per second per base damage
-          tower.hp -= (dps * delta) / 1000
-          if (tower.hp <= 0) {
-            tower.hp = 0
-            this.destroyTower(tower)
-          }
+          const meleeMult = enemy.melee ? 10 : 5
+          const dps = enemy.damage * meleeMult
+          tower.hp -= (dps * speedDelta) / 1000
+          if (tower.hp <= 0) { tower.hp = 0; this.destroyTower(tower) }
         }
       })
     })
@@ -783,12 +939,10 @@ export class GameScene extends Phaser.Scene {
     this.towers = this.towers.filter(tower => {
       if (tower.hp <= 0) return false
 
-      // Auto-heal
       if (tower.autoHealRate > 0 && tower.hp < tower.maxHp) {
-        tower.hp = Math.min(tower.maxHp, tower.hp + (tower.autoHealRate * delta) / 1000)
+        tower.hp = Math.min(tower.maxHp, tower.hp + (tower.autoHealRate * speedDelta) / 1000)
       }
 
-      // Update tower HP bar (only show when damaged)
       if (tower.hp < tower.maxHp) {
         tower.hpBg.setVisible(true).setPosition(tower.x, tower.y)
         tower.hpBar.setVisible(true).setPosition(tower.x, tower.y)
@@ -813,7 +967,6 @@ export class GameScene extends Phaser.Scene {
       if (tower.hp <= 0) return
       if (time - tower.lastFired < tower.fireRate) return
 
-      // Find closest enemy in range
       let closest = null
       let closestDist = Infinity
 
@@ -829,7 +982,6 @@ export class GameScene extends Phaser.Scene {
       })
 
       if (closest) {
-        // Scout stacking mechanic: +25% damage per consecutive hit on same target
         if (tower.type === 'scout') {
           if (tower.lastTarget === closest) {
             tower.stackCount = (tower.stackCount || 0) + 1
@@ -839,12 +991,9 @@ export class GameScene extends Phaser.Scene {
           }
           const stackMult = 1 + tower.stackCount * 0.25
           this.fireProjectile(tower, closest, Math.round(tower.damage * stackMult))
-        }
-        // Storm chain lightning: hits line of enemies
-        else if (tower.type === 'storm') {
+        } else if (tower.type === 'storm') {
           this.fireChainLightning(tower, closest)
-        }
-        else {
+        } else {
           this.fireProjectile(tower, closest)
         }
         tower.lastFired = time
@@ -860,17 +1009,15 @@ export class GameScene extends Phaser.Scene {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < 10) {
-        // Hit
         this.handleProjectileHit(proj)
         proj.sprite.destroy()
         return false
       }
 
-      const speed = (400 * delta) / 1000
+      const speed = (400 * speedDelta) / 1000
       proj.sprite.x += (dx / dist) * speed
       proj.sprite.y += (dy / dist) * speed
 
-      // Update target position if enemy still alive
       if (proj.target && proj.target.sprite.active) {
         proj.targetX = proj.target.sprite.x
         proj.targetY = proj.target.sprite.y
@@ -879,21 +1026,21 @@ export class GameScene extends Phaser.Scene {
       return true
     })
 
-    // Process deployables (mines and gas clouds)
+    // Process deployables
     this.deployables = this.deployables.filter(dep => {
       if (!dep.active) return false
 
       if (dep.type === 'mine') {
-        // Check if any enemy walks over the mine
         for (const enemy of this.enemies) {
           if (!enemy.sprite.active) continue
+          // Beholders fly over mines
+          if (enemy.flying) continue
           const dx = enemy.sprite.x - dep.x
           const dy = enemy.sprite.y - dep.y
           if (Math.sqrt(dx * dx + dy * dy) < 20) {
-            // Explode!
             dep.active = false
             dep.graphics.destroy()
-            // Damage all enemies in radius
+            // Explosion visual
             const boom = this.add.graphics().setDepth(11)
             boom.fillStyle(0xf39c12, 0.5)
             boom.fillCircle(dep.x, dep.y, dep.radius)
@@ -916,8 +1063,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (dep.type === 'gas') {
-        // Damage enemies in gas cloud each frame
-        dep.timer -= delta
+        dep.timer -= speedDelta
         if (dep.timer <= 0) {
           dep.active = false
           return false
@@ -927,7 +1073,7 @@ export class GameScene extends Phaser.Scene {
           const dx = enemy.sprite.x - dep.x
           const dy = enemy.sprite.y - dep.y
           if (Math.sqrt(dx * dx + dy * dy) <= dep.radius) {
-            this.damageEnemy(enemy, (dep.dps * delta) / 1000)
+            this.damageEnemy(enemy, (dep.dps * speedDelta) / 1000)
           }
         })
         return true
@@ -936,12 +1082,22 @@ export class GameScene extends Phaser.Scene {
       return true
     })
 
+    // Wave countdown between waves (auto-start after 15 seconds)
+    if (!this.waveActive && !this.gameOver && this.currentWave > 0 && this.currentWave < this.levelData.waves.length) {
+      this.waveCountdown -= speedDelta
+      if (this.waveCountdown <= 0) {
+        this.startNextWave()
+      } else {
+        const secs = Math.ceil(this.waveCountdown / 1000)
+        this.countdownText.setText(`Next wave in ${secs}s (click to start early for +${5 * secs} gold)`)
+      }
+    }
+
     // Check wave complete
     if (this.waveActive && this.enemies.length === 0) {
       this.waveActive = false
       this.currentWave++
 
-      // Gold wave bonus from shop upgrades
       if (this.goldWaveBonus > 0) {
         this.gold += this.goldWaveBonus
       }
@@ -949,15 +1105,47 @@ export class GameScene extends Phaser.Scene {
       if (this.currentWave >= this.levelData.waves.length) {
         this.handleGameOver(true)
       } else {
+        // Set up countdown for next wave
+        this.waveCountdown = 15000
         this.startWaveBtn.setText(`>> START WAVE ${this.currentWave + 1} <<`)
         this.startWaveBtn.setVisible(true)
+        this.countdownText.setVisible(true)
+
+        // Bonus gold for starting early
+        this.startWaveBtn.off('pointerdown')
+        this.startWaveBtn.on('pointerdown', () => {
+          const bonus = Math.max(0, Math.ceil(this.waveCountdown / 1000) * 5)
+          this.gold += bonus
+          if (bonus > 0) {
+            this.showFloatingText(this.cameras.main.centerX, this.cameras.main.height - 120, `+${bonus} gold!`, '#f1c40f')
+          }
+          this.startNextWave()
+        })
       }
       this.updateHUD()
     }
   }
 
+  showFloatingText(x, y, text, color) {
+    const ft = this.add.text(x, y, text, {
+      fontSize: '14px', color, fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(25)
+
+    this.tweens.add({
+      targets: ft,
+      y: y - 30,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => ft.destroy(),
+    })
+  }
+
   fireProjectile(tower, enemy, overrideDamage) {
-    const sprite = this.add.image(tower.x, tower.y, tower.projectileTexture).setDepth(10)
+    const texKey = tower.projectileTexture
+    const sprite = this.add.image(tower.x, tower.y, texKey)
+      .setDisplaySize(10, 10)
+      .setDepth(10)
     this.projectileGroup.add(sprite)
 
     this.projectiles.push({
@@ -973,15 +1161,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   fireChainLightning(tower, primary) {
-    // Hit primary target
     this.damageEnemy(primary, tower.damage)
 
-    // Visual: lightning bolt to primary
     const bolt = this.add.graphics().setDepth(11)
     bolt.lineStyle(2, 0x9b59b6, 0.8)
     bolt.lineBetween(tower.x, tower.y, primary.sprite.x, primary.sprite.y)
 
-    // Chain to up to 4 more enemies, with 20% damage falloff per chain
     const hit = new Set([primary])
     let lastX = primary.sprite.x
     let lastY = primary.sprite.y
@@ -991,7 +1176,6 @@ export class GameScene extends Phaser.Scene {
       chainDamage = Math.round(chainDamage * 0.8)
       if (chainDamage < 1) break
 
-      // Find nearest unhit enemy within 100px of last hit
       let nearest = null
       let nearDist = Infinity
       this.enemies.forEach(enemy => {
@@ -1010,7 +1194,6 @@ export class GameScene extends Phaser.Scene {
       hit.add(nearest)
       this.damageEnemy(nearest, chainDamage)
 
-      // Draw chain bolt
       bolt.lineStyle(Math.max(1, 2 - chain * 0.4), 0x9b59b6, 0.6 - chain * 0.1)
       bolt.lineBetween(lastX, lastY, nearest.sprite.x, nearest.sprite.y)
 
@@ -1018,18 +1201,24 @@ export class GameScene extends Phaser.Scene {
       lastY = nearest.sprite.y
     }
 
-    // Fade out lightning visual
     this.tweens.add({
-      targets: bolt,
-      alpha: 0,
-      duration: 200,
+      targets: bolt, alpha: 0, duration: 200,
       onComplete: () => bolt.destroy(),
     })
   }
 
   handleProjectileHit(proj) {
+    // Impact visual
+    const impactColor = proj.slow > 0 ? 0x00bcd4 : proj.splash > 0 ? 0xe74c3c : 0xf1c40f
+    const impact = this.add.graphics().setDepth(11)
+    impact.fillStyle(impactColor, 0.6)
+    impact.fillCircle(proj.targetX, proj.targetY, proj.splash > 0 ? proj.splash / 3 : 8)
+    this.tweens.add({
+      targets: impact, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 200,
+      onComplete: () => impact.destroy(),
+    })
+
     if (proj.splash > 0) {
-      // AOE damage
       this.enemies.forEach(enemy => {
         if (!enemy.sprite.active) return
         const dx = enemy.sprite.x - proj.targetX
@@ -1052,17 +1241,137 @@ export class GameScene extends Phaser.Scene {
 
   damageEnemy(enemy, damage) {
     enemy.hp -= damage
+
+    // Damage number float (only for significant hits)
+    if (damage >= 10) {
+      const dmgText = this.add.text(enemy.sprite.x + Phaser.Math.Between(-8, 8), enemy.sprite.y - 15, Math.round(damage), {
+        fontSize: '10px', color: '#fff',
+        stroke: '#000', strokeThickness: 1,
+      }).setOrigin(0.5).setDepth(15)
+      this.tweens.add({
+        targets: dmgText, y: dmgText.y - 20, alpha: 0, duration: 500,
+        onComplete: () => dmgText.destroy(),
+      })
+    }
+
     if (enemy.hp <= 0) {
       this.gold += enemy.reward
-      // Drop gems (small chance per kill, guaranteed on bosses)
+      this.enemiesKilled++
       this.dropGem(enemy.sprite.x, enemy.sprite.y, enemy.reward)
+
+      // Death effect
+      this.spawnDeathEffect(enemy)
+
+      // Slime split: spawn baby slimes at current position
+      if (enemy.splits > 0) {
+        this.splitEnemy(enemy)
+      }
+
       this.removeEnemy(enemy)
       this.updateHUD()
     }
   }
 
+  spawnDeathEffect(enemy) {
+    const x = enemy.sprite.x
+    const y = enemy.sprite.y
+
+    // Small particle burst
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2
+      const particle = this.add.graphics().setDepth(12)
+      const pColor = enemy.boss ? 0xe74c3c : 0xf1c40f
+      particle.fillStyle(pColor, 0.8)
+      particle.fillCircle(0, 0, enemy.boss ? 4 : 2)
+      particle.setPosition(x, y)
+
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * (enemy.boss ? 40 : 20),
+        y: y + Math.sin(angle) * (enemy.boss ? 40 : 20),
+        alpha: 0,
+        duration: enemy.boss ? 600 : 300,
+        onComplete: () => particle.destroy(),
+      })
+    }
+  }
+
+  splitEnemy(enemy) {
+    const babyDef = ENEMY_TYPES.slime_baby
+    if (!babyDef) return
+
+    for (let i = 0; i < enemy.splits; i++) {
+      const offsetX = Phaser.Math.Between(-15, 15)
+      const offsetY = Phaser.Math.Between(-15, 15)
+
+      const spriteSize = Math.round(28 * (babyDef.size || 0.6))
+      const sprite = this.add.image(enemy.sprite.x + offsetX, enemy.sprite.y + offsetY, babyDef.texture)
+        .setDisplaySize(spriteSize, spriteSize)
+        .setDepth(6)
+        .setTint(0x88ff88) // green tint for babies
+      this.enemyGroup.add(sprite)
+
+      const scaledHp = Math.round(babyDef.hp * this.diffMult.enemyHp)
+      const scaledSpeed = Math.round(babyDef.speed * this.diffMult.enemySpeed)
+
+      const hpBg = this.add.graphics().setDepth(7)
+      const hpBar = this.add.graphics().setDepth(8)
+
+      const baby = {
+        sprite, hpBg, hpBar,
+        type: 'slime_baby',
+        hp: scaledHp, maxHp: scaledHp,
+        baseSpeed: scaledSpeed, speed: scaledSpeed,
+        reward: babyDef.reward,
+        damage: babyDef.damage,
+        waypointIndex: enemy.waypointIndex, // continue from parent's position
+        slowTimer: 0,
+        barWidth: 20,
+        splits: 0, regens: 0, towerDamage: 0,
+        kamikaze: false, flying: false, melee: false, boss: false,
+        size: babyDef.size || 0.6,
+        namePlate: null,
+      }
+
+      this.enemies.push(baby)
+    }
+  }
+
+  kamikazeExplosion(enemy) {
+    // Find nearest tower
+    let nearest = null
+    let nearDist = Infinity
+    this.towers.forEach(tower => {
+      if (tower.hp <= 0) return
+      const dx = enemy.sprite.x - tower.x
+      const dy = enemy.sprite.y - tower.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < nearDist) {
+        nearest = tower
+        nearDist = dist
+      }
+    })
+
+    if (nearest && nearDist < TILE * 3) {
+      // Explosion damage to tower
+      nearest.hp -= 50
+      if (nearest.hp <= 0) {
+        nearest.hp = 0
+        this.destroyTower(nearest)
+      }
+
+      // Explosion visual
+      const boom = this.add.graphics().setDepth(11)
+      boom.fillStyle(0xff6600, 0.6)
+      boom.fillCircle(nearest.x, nearest.y, 40)
+      this.tweens.add({
+        targets: boom, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400,
+        onComplete: () => boom.destroy(),
+      })
+    }
+  }
+
   dropGem(x, y, reward) {
-    // Gem drop chance scales with enemy value: weak=20%, strong=50%, boss=100%
     const chance = reward >= 30 ? 1.0 : reward >= 15 ? 0.5 : 0.2
     if (Math.random() > chance) return
 
@@ -1073,16 +1382,12 @@ export class GameScene extends Phaser.Scene {
 
     const gem = this.add.graphics().setDepth(12)
     gem.fillStyle(color, 0.9)
-    // Diamond shape
     gem.fillPoints([
-      { x: 0, y: -6 },
-      { x: 5, y: 0 },
-      { x: 0, y: 6 },
-      { x: -5, y: 0 },
+      { x: 0, y: -6 }, { x: 5, y: 0 },
+      { x: 0, y: 6 }, { x: -5, y: 0 },
     ], true)
     gem.setPosition(x, y)
 
-    // Float up animation
     this.tweens.add({
       targets: gem,
       y: y - 20,
@@ -1094,7 +1399,6 @@ export class GameScene extends Phaser.Scene {
     const gemDrop = { graphics: gem, x, y: y - 20, value: gemValue, timer: 5000 }
     this.gemDrops.push(gemDrop)
 
-    // Make clickable — tapping collects the gem
     const zone = this.add.zone(x, y - 10, 30, 30).setInteractive().setDepth(13)
     zone.on('pointerdown', () => {
       this.collectGem(gemDrop)
@@ -1102,7 +1406,6 @@ export class GameScene extends Phaser.Scene {
     })
     gemDrop.zone = zone
 
-    // Auto-collect after 3 seconds
     this.time.delayedCall(3000, () => {
       if (gemDrop.graphics.active) {
         this.collectGem(gemDrop)
@@ -1115,13 +1418,11 @@ export class GameScene extends Phaser.Scene {
     if (!gemDrop.graphics.active) return
     this.gemsCollected += gemDrop.value
 
-    // Float-up collect animation
     this.tweens.add({
       targets: gemDrop.graphics,
       y: gemDrop.graphics.y - 30,
       alpha: 0,
-      scaleX: 1.5,
-      scaleY: 1.5,
+      scaleX: 1.5, scaleY: 1.5,
       duration: 300,
       onComplete: () => gemDrop.graphics.destroy(),
     })
@@ -1131,13 +1432,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   destroyTower(tower) {
-    // Visual destruction effect
     this.tweens.add({
       targets: tower.sprite,
-      alpha: 0,
-      scaleX: 0.3,
-      scaleY: 0.3,
-      duration: 300,
+      alpha: 0, scaleX: 0.3, scaleY: 0.3, duration: 300,
       onComplete: () => {
         tower.sprite.destroy()
         tower.hpBg.destroy()
@@ -1151,17 +1448,19 @@ export class GameScene extends Phaser.Scene {
     enemy.sprite.destroy()
     enemy.hpBg.destroy()
     enemy.hpBar.destroy()
+    if (enemy.namePlate) enemy.namePlate.destroy()
     this.enemies = this.enemies.filter(e => e !== enemy)
   }
 
   handleGameOver(won) {
     this.gameOver = true
     this.startWaveBtn.setVisible(false)
+    this.countdownText.setVisible(false)
+    this.stopMusic()
 
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
 
-    // Calculate stars
     let stars = 0
     if (won) {
       const lifeRatio = this.lives / this.startLives
@@ -1171,20 +1470,16 @@ export class GameScene extends Phaser.Scene {
     // Save progress
     if (won) {
       unlockLevel(this.levelIndex + 1)
-      // Save stars with difficulty key
       const starKey = `${this.levelIndex}_${this.difficulty}`
       setLevelStars(starKey, stars)
-      // Also save plain level stars for level select backward compat
       setLevelStars(this.levelIndex, stars)
     }
-    // Always save gems earned this level
     if (this.gemsCollected > 0) {
       const save = loadSave()
       save.gems += this.gemsCollected
       saveSave(save)
     }
 
-    // Update registry for level select
     const save = loadSave()
     this.registry.set('gameState', { levelsUnlocked: save.levelsUnlocked })
 
@@ -1193,7 +1488,6 @@ export class GameScene extends Phaser.Scene {
     overlay.fillStyle(0x000000, 0.7)
     overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
 
-    // Background image
     const bgKey = won ? 'victory_bg' : 'gameover_bg'
     if (this.textures.exists(bgKey)) {
       this.add.image(cx, cy, bgKey)
@@ -1201,57 +1495,61 @@ export class GameScene extends Phaser.Scene {
     }
 
     const title = won ? 'VICTORY!' : 'DEFEAT'
-    const color = won ? '#2ecc71' : '#e74c3c'
+    const titleColor = won ? '#2ecc71' : '#e74c3c'
 
     this.add.text(cx, cy - 70, title, {
-      fontSize: '48px', color, fontStyle: 'bold',
+      fontSize: '48px', color: titleColor, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51)
 
-    // Star display (for victories)
     if (won) {
-      const starY = cy - 30
       for (let i = 0; i < 3; i++) {
         const starX = cx - 40 + i * 40
         const filled = i < stars
-        this.add.text(starX, starY, filled ? '\u2605' : '\u2606', {
+        this.add.text(starX, cy - 30, filled ? '\u2605' : '\u2606', {
           fontSize: '32px',
           color: filled ? '#f1c40f' : '#555',
-          stroke: '#000',
-          strokeThickness: 2,
+          stroke: '#000', strokeThickness: 2,
         }).setOrigin(0.5).setDepth(51)
       }
     }
 
-    // Gem count
+    // Stats
     const gemSave = loadSave()
-    this.add.text(cx, cy + 5, `Gems earned: ${this.gemsCollected} | Total: ${gemSave.gems}`, {
-      fontSize: '14px', color: '#9b59b6', fontStyle: 'bold',
+    this.add.text(cx, cy + 5, `Gems: +${this.gemsCollected} (${gemSave.gems} total) | Kills: ${this.enemiesKilled}`, {
+      fontSize: '13px', color: '#9b59b6', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(51)
 
+    // Difficulty badge
+    const diffColors = { casual: '#2ecc71', normal: '#f1c40f', brutal: '#e74c3c' }
+    this.add.text(cx, cy + 25, `${this.difficulty.toUpperCase()} MODE`, {
+      fontSize: '11px', color: diffColors[this.difficulty] || '#aaa',
+      stroke: '#000', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(51)
+
     // Buttons
-    const menuBtn = this.add.text(cx - 80, cy + 45, 'Menu', {
+    const menuBtn = this.add.text(cx - 80, cy + 55, 'Menu', {
       fontSize: '20px', color: '#fff', backgroundColor: '#16213e',
       padding: { x: 16, y: 8 },
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     menuBtn.on('pointerdown', () => this.scene.start('LevelSelectScene'))
 
     if (won && this.levelIndex + 1 < LEVELS.length) {
-      const nextBtn = this.add.text(cx + 80, cy + 45, 'Next', {
+      const nextBtn = this.add.text(cx + 80, cy + 55, 'Next', {
         fontSize: '20px', color: '#fff', backgroundColor: '#e94560',
         padding: { x: 16, y: 8 },
       }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
       nextBtn.on('pointerdown', () => {
-        this.scene.start('GameScene', { levelIndex: this.levelIndex + 1 })
+        this.scene.start('GameScene', { levelIndex: this.levelIndex + 1, difficulty: this.difficulty })
       })
     }
 
-    const retryBtn = this.add.text(cx, cy + 90, 'Retry', {
+    const retryBtn = this.add.text(cx, cy + 100, 'Retry', {
       fontSize: '16px', color: '#888',
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     retryBtn.on('pointerdown', () => {
-      this.scene.start('GameScene', { levelIndex: this.levelIndex })
+      this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty })
     })
   }
 
@@ -1260,5 +1558,14 @@ export class GameScene extends Phaser.Scene {
     this.livesText.setText(`${this.lives}`)
     this.waveText.setText(`Wave ${this.currentWave + 1}/${this.levelData.waves.length}`)
     this.gemText.setText(`${this.gemsCollected}`)
+    this.killText.setText(`\u2620 ${this.enemiesKilled}`)
+  }
+
+  updateGameState() {
+    // Sync state to registry for cloud saves
+    this.registry.set('gameState', {
+      levelIndex: this.levelIndex,
+      levelsUnlocked: this.saveData.levelsUnlocked,
+    })
   }
 }
