@@ -13,23 +13,23 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Initialize database tables
+// Initialize TNT-specific tables only (prefixed to avoid conflicts with other apps)
 db.query(`
-  CREATE TABLE IF NOT EXISTS users (
+  CREATE TABLE IF NOT EXISTS tnt_users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
   );
-  CREATE TABLE IF NOT EXISTS saves (
+  CREATE TABLE IF NOT EXISTS tnt_saves (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES tnt_users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     data JSONB NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
   );
-`).then(() => console.log('Database tables ready'))
+`).then(() => console.log('TNT database tables ready'))
   .catch(err => console.error('DB init error:', err));
 
 // API routes

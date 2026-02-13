@@ -21,7 +21,7 @@ function auth(req, res, next) {
 router.get('/', auth, async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, name, data, created_at, updated_at FROM saves WHERE user_id = $1 ORDER BY updated_at DESC',
+      'SELECT id, name, data, created_at, updated_at FROM tnt_saves WHERE user_id = $1 ORDER BY updated_at DESC',
       [req.user.id]
     );
     res.json({ saves: result.rows });
@@ -38,7 +38,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'Name and data required' });
     }
     const result = await db.query(
-      'INSERT INTO saves (user_id, name, data) VALUES ($1, $2, $3) RETURNING id, name, data, created_at',
+      'INSERT INTO tnt_saves (user_id, name, data) VALUES ($1, $2, $3) RETURNING id, name, data, created_at',
       [req.user.id, name, data]
     );
     res.json({ save: result.rows[0] });
@@ -51,7 +51,7 @@ router.post('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, name, data, created_at, updated_at FROM saves WHERE id = $1 AND user_id = $2',
+      'SELECT id, name, data, created_at, updated_at FROM tnt_saves WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
     );
     if (result.rows.length === 0) {
@@ -66,7 +66,7 @@ router.get('/:id', auth, async (req, res) => {
 
 router.delete('/:id', auth, async (req, res) => {
   try {
-    await db.query('DELETE FROM saves WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    await db.query('DELETE FROM tnt_saves WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete save error:', err);

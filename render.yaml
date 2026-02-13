@@ -2,13 +2,12 @@ services:
   - type: web
     name: towers-n-trolls-api
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: ests-dev
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: NODE_ENV

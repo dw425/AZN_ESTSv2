@@ -16,14 +16,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 4 characters' });
     }
 
-    const existing = await db.query('SELECT id FROM users WHERE username = $1', [username]);
+    const existing = await db.query('SELECT id FROM tnt_users WHERE username = $1', [username]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Username already taken' });
     }
 
     const hash = await bcrypt.hash(password, 10);
     const result = await db.query(
-      'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id',
+      'INSERT INTO tnt_users (username, password) VALUES ($1, $2) RETURNING id',
       [username, hash]
     );
 
@@ -42,7 +42,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await db.query('SELECT * FROM tnt_users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
