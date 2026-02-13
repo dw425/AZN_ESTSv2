@@ -1267,7 +1267,7 @@ export class GameScene extends Phaser.Scene {
       if (rdx <= 2 && rdy <= 2) {
         // Original game: runes DOUBLE the stat (confirmed via APK Help_RuneDamage/Speed/Distance)
         if (rune.type === 'damage') tower.damage = Math.round(tower.damage * 2.0)
-        if (rune.type === 'speed') tower.fireRate = Math.round(tower.fireRate * 0.5)
+        if (rune.type === 'speed') tower.fireRate = Math.max(200, Math.round(tower.fireRate * 0.5))
         if (rune.type === 'range') tower.range = Math.round(tower.range * 2.0)
         const runeColors = { damage: '#e74c3c', speed: '#3498db', range: '#2ecc71' }
         this.showFloatingText(tower.x, tower.y - 30, `${rune.type.toUpperCase()} RUNE!`, runeColors[rune.type])
@@ -1385,7 +1385,7 @@ export class GameScene extends Phaser.Scene {
             const rdy = Math.abs(rune.r - tower.gridRow)
             if (rdx <= 2 && rdy <= 2) {
               if (rune.type === 'damage') tower.damage = Math.round(tower.damage * 2.0)
-              if (rune.type === 'speed') tower.fireRate = Math.round(tower.fireRate * 0.5)
+              if (rune.type === 'speed') tower.fireRate = Math.max(200, Math.round(tower.fireRate * 0.5))
               if (rune.type === 'range') tower.range = Math.round(tower.range * 2.0)
             }
           })
@@ -1997,10 +1997,10 @@ export class GameScene extends Phaser.Scene {
           if (dist <= tower.range) {
             let score
             if (mode === 'first') {
-              // Normalize progress so flying (2 waypoints) and ground (10+ waypoints) are comparable
-              const enemyWp = enemy.flying ? this.flyWaypoints : this.waypoints
-              const progress = enemy.waypointIndex / enemyWp.length
-              score = progress * 10000 - dist
+              // Use distance to exit for consistent priority across flying/ground enemies
+              const exitWp = this.waypoints[this.waypoints.length - 1]
+              const distToExit = Math.sqrt((enemy.sprite.x - exitWp.x) ** 2 + (enemy.sprite.y - exitWp.y) ** 2)
+              score = -distToExit
             } else if (mode === 'strong') {
               score = enemy.maxHp * 10000 + enemy.hp
             } else if (mode === 'weak') {
@@ -2189,7 +2189,7 @@ export class GameScene extends Phaser.Scene {
             this.damageEnemy(enemy, (dep.dps * speedDelta) / 1000)
             // Gas slows enemies by 40%
             enemy.slowTimer = Math.max(enemy.slowTimer || 0, 500)
-            enemy.speed = enemy.baseSpeed * 0.6
+            enemy.speed = Math.min(enemy.speed, enemy.baseSpeed * 0.6)
             if (enemy.sprite && enemy.sprite.active) enemy.sprite.setTint(0x2ecc71)
             // Track unique enemies hit for gas_multi_5 bonus mission
             if (dep.hitEnemies) dep.hitEnemies.add(enemy)
@@ -3079,7 +3079,7 @@ export class GameScene extends Phaser.Scene {
     })
 
     if (this.endlessMode) {
-      this.add.text(cx, cy - 45, `Survived ${this.currentWave} waves!`, {
+      this.add.text(cx, cy - 45, `Reached wave ${this.currentWave + 1}!`, {
         fontSize: '16px', color: '#fff', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(0.5).setDepth(51)

@@ -108,6 +108,8 @@ export class MenuScene extends Phaser.Scene {
         this.menuMusic = existing
         return
       }
+      // Destroy any stopped music instance to prevent memory leak
+      if (existing) existing.destroy()
       // Stop only existing music tracks, not SFX
       this.stopMenuMusic()
       if (this.cache.audio.exists('music_menu')) {

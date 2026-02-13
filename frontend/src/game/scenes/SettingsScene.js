@@ -12,9 +12,11 @@ export class SettingsScene extends Phaser.Scene {
     const cx = w / 2
 
     this.events.on('shutdown', () => {
+      saveSave(this.save)
       this.tweens.killAll()
       this.time.removeAllEvents()
     })
+    this._confirmReset = false
 
     // Background
     if (this.textures.exists('loading_bg')) {
@@ -81,6 +83,7 @@ export class SettingsScene extends Phaser.Scene {
     }).setOrigin(0.5).setInteractive({ useHandCursor: true })
     resetBtn.on('pointerdown', () => {
       this.save.tutorialsSeen = {}
+      saveSave(this.save)
       this.showFloatingText(cx, y - 20, 'Tutorials Reset!', '#2ecc71')
     })
     resetBtn.on('pointerover', () => resetBtn.setColor('#fff'))

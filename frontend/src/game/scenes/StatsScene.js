@@ -110,8 +110,11 @@ export class StatsScene extends Phaser.Scene {
       }).setOrigin(0.5)
     } else {
       bestEntries.forEach(([key, score], i) => {
-        const lvlIdx = parseInt(key)
-        const name = LEVELS[lvlIdx] ? LEVELS[lvlIdx].name : `Level ${lvlIdx + 1}`
+        const parts = key.split('_')
+        const lvlIdx = parseInt(parts[0])
+        const diff = parts[1] || ''
+        const lvlName = LEVELS[lvlIdx] ? LEVELS[lvlIdx].name : `Level ${lvlIdx + 1}`
+        const name = diff ? `${lvlName} (${diff})` : lvlName
         this.add.text(panelX + 25, pbY + 25 + i * 22, `${name}`, {
           fontSize: '12px', color: '#aaa',
         })
