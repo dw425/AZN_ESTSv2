@@ -157,6 +157,7 @@ export function loadSave() {
         ...DEFAULT_SAVE,
         ...data,
         upgrades: { ...DEFAULT_SAVE.upgrades, ...(data.upgrades || {}) },
+        settings: { ...DEFAULT_SAVE.settings, ...(data.settings || {}) },
       }
     }
   } catch (e) {

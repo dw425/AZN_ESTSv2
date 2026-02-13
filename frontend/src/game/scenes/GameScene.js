@@ -1050,7 +1050,7 @@ export class GameScene extends Phaser.Scene {
     })
     // Also check treasure chests as clickable targets
     this.specialTiles.chests.forEach(chest => {
-      if (chest.opened || !chest.sprite.active) return
+      if (chest.opened || !chest.sprite || !chest.sprite.active) return
       const dx = chest.x - x
       const dy = chest.y - y
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -1066,7 +1066,7 @@ export class GameScene extends Phaser.Scene {
     let nearest = null
     let nearDist = 30
     this.specialTiles.chests.forEach(chest => {
-      if (chest.opened || !chest.sprite.active) return
+      if (chest.opened || !chest.sprite || !chest.sprite.active) return
       const dx = chest.x - x
       const dy = chest.y - y
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -1499,7 +1499,7 @@ export class GameScene extends Phaser.Scene {
       magResist: def.magResist || 0,
       // Boss special ability
       bossAbility: def.bossAbility || null,
-      bossAbilityTimer: 0,
+      bossAbilityTimer: 5000, // First ability fires after 5 seconds
       // Flying enemies use their own direct waypoints
       flyingWaypoints,
       // Boss name plate
@@ -2147,7 +2147,7 @@ export class GameScene extends Phaser.Scene {
 
     // Check if hitting a treasure chest
     if (proj.target && proj.target.isChest) {
-      this.damageChest(proj.target, proj.damage)
+      if (!proj.target.opened) this.damageChest(proj.target, proj.damage)
       return
     }
 
@@ -2871,7 +2871,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < numGroups; i++) {
       const entry = available[Math.floor(Math.random() * available.length)]
       const count = Math.min(3 + Math.floor(waveNum * 0.8) + Math.floor(Math.random() * 3), 25)
-      groups.push({ type: entry.type, count })
+      groups.push({ type: entry.type, count, interval: Math.max(300, 1000 - waveNum * 20) })
     }
 
     // Every 10 waves, add a boss
@@ -2879,7 +2879,7 @@ export class GameScene extends Phaser.Scene {
     if (isBoss) {
       const bosses = ['boss_beholder', 'boss_ogre', 'boss_dragon']
       const bossType = bosses[Math.min(Math.floor(waveNum / 10) - 1, bosses.length - 1)]
-      groups.push({ type: bossType, count: 1 })
+      groups.push({ type: bossType, count: 1, interval: 1000 })
     }
 
     return { enemies: groups, boss: isBoss }
