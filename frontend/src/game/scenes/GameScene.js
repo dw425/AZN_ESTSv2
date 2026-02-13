@@ -12,15 +12,24 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.levelIndex = data.levelIndex || 0
     this.levelData = LEVELS[this.levelIndex]
+    this.difficulty = data.difficulty || 'normal'
+
+    // Difficulty multipliers
+    const diffScale = {
+      casual:  { gold: 1.5, lives: 1.5, enemyHp: 0.75, enemySpeed: 0.9, gemMult: 0.5 },
+      normal:  { gold: 1.0, lives: 1.0, enemyHp: 1.0,  enemySpeed: 1.0, gemMult: 1.0 },
+      brutal:  { gold: 0.7, lives: 0.75, enemyHp: 1.5, enemySpeed: 1.1, gemMult: 2.0 },
+    }
+    this.diffMult = diffScale[this.difficulty] || diffScale.normal
 
     // Load save and apply upgrades
     this.saveData = loadSave()
     const ups = this.saveData.upgrades
 
-    // Apply gold start boost (+20 gold per level)
-    this.gold = this.levelData.startGold + (ups.goldStartBoost || 0) * 20
-    // Apply base health boost (+1 life per level)
-    this.lives = this.levelData.lives + (ups.baseHealthBoost || 0)
+    // Apply gold start boost (+20 gold per level), scaled by difficulty
+    this.gold = Math.round((this.levelData.startGold + (ups.goldStartBoost || 0) * 20) * this.diffMult.gold)
+    // Apply base health boost (+1 life per level), scaled by difficulty
+    this.lives = Math.round((this.levelData.lives + (ups.baseHealthBoost || 0)) * this.diffMult.lives)
     this.startLives = this.lives
 
     // Store boost multipliers for towers
@@ -675,15 +684,18 @@ export class GameScene extends Phaser.Scene {
     hpBar.fillStyle(0x2ecc71)
     hpBar.fillRect(-14, -20, 28, 4)
 
+    const scaledHp = Math.round(def.hp * this.diffMult.enemyHp)
+    const scaledSpeed = Math.round(def.speed * this.diffMult.enemySpeed)
+
     const enemy = {
       sprite,
       hpBg,
       hpBar,
       type,
-      hp: def.hp,
-      maxHp: def.hp,
-      baseSpeed: def.speed,
-      speed: def.speed,
+      hp: scaledHp,
+      maxHp: scaledHp,
+      baseSpeed: scaledSpeed,
+      speed: scaledSpeed,
       reward: def.reward,
       damage: def.damage,
       waypointIndex: 0,
@@ -817,7 +829,24 @@ export class GameScene extends Phaser.Scene {
       })
 
       if (closest) {
-        this.fireProjectile(tower, closest)
+        // Scout stacking mechanic: +25% damage per consecutive hit on same target
+        if (tower.type === 'scout') {
+          if (tower.lastTarget === closest) {
+            tower.stackCount = (tower.stackCount || 0) + 1
+          } else {
+            tower.stackCount = 0
+            tower.lastTarget = closest
+          }
+          const stackMult = 1 + tower.stackCount * 0.25
+          this.fireProjectile(tower, closest, Math.round(tower.damage * stackMult))
+        }
+        // Storm chain lightning: hits line of enemies
+        else if (tower.type === 'storm') {
+          this.fireChainLightning(tower, closest)
+        }
+        else {
+          this.fireProjectile(tower, closest)
+        }
         tower.lastFired = time
       }
     })
@@ -927,7 +956,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  fireProjectile(tower, enemy) {
+  fireProjectile(tower, enemy, overrideDamage) {
     const sprite = this.add.image(tower.x, tower.y, tower.projectileTexture).setDepth(10)
     this.projectileGroup.add(sprite)
 
@@ -936,10 +965,65 @@ export class GameScene extends Phaser.Scene {
       target: enemy,
       targetX: enemy.sprite.x,
       targetY: enemy.sprite.y,
-      damage: tower.damage,
+      damage: overrideDamage || tower.damage,
       splash: tower.splash,
       slow: tower.slow,
       slowDuration: tower.slowDuration,
+    })
+  }
+
+  fireChainLightning(tower, primary) {
+    // Hit primary target
+    this.damageEnemy(primary, tower.damage)
+
+    // Visual: lightning bolt to primary
+    const bolt = this.add.graphics().setDepth(11)
+    bolt.lineStyle(2, 0x9b59b6, 0.8)
+    bolt.lineBetween(tower.x, tower.y, primary.sprite.x, primary.sprite.y)
+
+    // Chain to up to 4 more enemies, with 20% damage falloff per chain
+    const hit = new Set([primary])
+    let lastX = primary.sprite.x
+    let lastY = primary.sprite.y
+    let chainDamage = tower.damage
+
+    for (let chain = 0; chain < 4; chain++) {
+      chainDamage = Math.round(chainDamage * 0.8)
+      if (chainDamage < 1) break
+
+      // Find nearest unhit enemy within 100px of last hit
+      let nearest = null
+      let nearDist = Infinity
+      this.enemies.forEach(enemy => {
+        if (!enemy.sprite.active || hit.has(enemy)) return
+        const dx = enemy.sprite.x - lastX
+        const dy = enemy.sprite.y - lastY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < 100 && dist < nearDist) {
+          nearest = enemy
+          nearDist = dist
+        }
+      })
+
+      if (!nearest) break
+
+      hit.add(nearest)
+      this.damageEnemy(nearest, chainDamage)
+
+      // Draw chain bolt
+      bolt.lineStyle(Math.max(1, 2 - chain * 0.4), 0x9b59b6, 0.6 - chain * 0.1)
+      bolt.lineBetween(lastX, lastY, nearest.sprite.x, nearest.sprite.y)
+
+      lastX = nearest.sprite.x
+      lastY = nearest.sprite.y
+    }
+
+    // Fade out lightning visual
+    this.tweens.add({
+      targets: bolt,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => bolt.destroy(),
     })
   }
 
@@ -982,7 +1066,8 @@ export class GameScene extends Phaser.Scene {
     const chance = reward >= 30 ? 1.0 : reward >= 15 ? 0.5 : 0.2
     if (Math.random() > chance) return
 
-    const gemValue = reward >= 30 ? 3 : reward >= 15 ? 2 : 1
+    const baseGem = reward >= 30 ? 3 : reward >= 15 ? 2 : 1
+    const gemValue = Math.max(1, Math.round(baseGem * this.diffMult.gemMult))
     const colors = [0x9b59b6, 0x3498db, 0x2ecc71, 0xe74c3c, 0xf1c40f]
     const color = colors[Math.floor(Math.random() * colors.length)]
 
@@ -1086,6 +1171,10 @@ export class GameScene extends Phaser.Scene {
     // Save progress
     if (won) {
       unlockLevel(this.levelIndex + 1)
+      // Save stars with difficulty key
+      const starKey = `${this.levelIndex}_${this.difficulty}`
+      setLevelStars(starKey, stars)
+      // Also save plain level stars for level select backward compat
       setLevelStars(this.levelIndex, stars)
     }
     // Always save gems earned this level

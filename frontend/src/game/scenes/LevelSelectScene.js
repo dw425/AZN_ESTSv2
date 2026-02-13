@@ -139,7 +139,7 @@ export class LevelSelectScene extends Phaser.Scene {
           this.tweens.add({ targets: zone, scaleX: 1, scaleY: 1, duration: 100 })
         })
         zone.on('pointerdown', () => {
-          this.scene.start('GameScene', { levelIndex: i })
+          this.showDifficultyPopup(i, save)
         })
       }
     })
@@ -156,6 +156,9 @@ export class LevelSelectScene extends Phaser.Scene {
     backBtn.on('pointerover', () => backBtn.setColor('#e94560'))
     backBtn.on('pointerout', () => backBtn.setColor('#aaa'))
 
+    // Difficulty popup container (hidden)
+    this.diffPopup = null
+
     // Shop button
     const shopBtn = this.add.text(w - 80, h - 35, 'Shop', {
       fontSize: '20px',
@@ -167,5 +170,72 @@ export class LevelSelectScene extends Phaser.Scene {
     shopBtn.on('pointerdown', () => this.scene.start('ShopScene'))
     shopBtn.on('pointerover', () => shopBtn.setColor('#c39bd3'))
     shopBtn.on('pointerout', () => shopBtn.setColor('#9b59b6'))
+  }
+
+  showDifficultyPopup(levelIndex, save) {
+    if (this.diffPopup) this.diffPopup.destroy()
+
+    const cx = this.cameras.main.width / 2
+    const cy = this.cameras.main.height / 2
+
+    const container = this.add.container(cx, cy).setDepth(50)
+
+    // Backdrop
+    const backdrop = this.add.graphics()
+    backdrop.fillStyle(0x000000, 0.7)
+    backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
+    container.add(backdrop)
+
+    // Panel
+    const panel = this.add.graphics()
+    panel.fillStyle(0x16213e, 0.95)
+    panel.fillRoundedRect(-140, -90, 280, 180, 10)
+    panel.lineStyle(2, 0xe94560)
+    panel.strokeRoundedRect(-140, -90, 280, 180, 10)
+    container.add(panel)
+
+    const levelName = LEVELS[levelIndex]?.name || `Level ${levelIndex + 1}`
+    container.add(this.add.text(0, -70, levelName, {
+      fontSize: '20px', color: '#fff', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5))
+
+    const difficulties = [
+      { key: 'casual', label: 'Casual', color: '#2ecc71', desc: 'More gold, more lives' },
+      { key: 'normal', label: 'Normal', color: '#f1c40f', desc: 'Standard challenge' },
+      { key: 'brutal', label: 'Brutal', color: '#e74c3c', desc: 'Less gold, tougher enemies' },
+    ]
+
+    difficulties.forEach((diff, i) => {
+      const y = -25 + i * 35
+      const starKey = `${levelIndex}_${diff.key}`
+      const stars = save.levelStars[starKey] || 0
+      let starStr = ''
+      for (let s = 0; s < 3; s++) starStr += s < stars ? '\u2605' : '\u2606'
+
+      const btn = this.add.text(-100, y, `${diff.label}  ${starStr}`, {
+        fontSize: '16px', color: diff.color, fontStyle: 'bold',
+      }).setInteractive({ useHandCursor: true })
+
+      btn.on('pointerdown', () => {
+        this.scene.start('GameScene', { levelIndex, difficulty: diff.key })
+      })
+      btn.on('pointerover', () => btn.setAlpha(0.7))
+      btn.on('pointerout', () => btn.setAlpha(1))
+      container.add(btn)
+
+      container.add(this.add.text(100, y + 2, diff.desc, {
+        fontSize: '10px', color: '#888',
+      }).setOrigin(1, 0))
+    })
+
+    // Close button
+    const closeBtn = this.add.text(120, -80, 'X', {
+      fontSize: '18px', color: '#888', fontStyle: 'bold',
+    }).setInteractive({ useHandCursor: true })
+    closeBtn.on('pointerdown', () => container.destroy())
+    container.add(closeBtn)
+
+    this.diffPopup = container
   }
 }
