@@ -1812,7 +1812,7 @@ export class GameScene extends Phaser.Scene {
           return
         }
       } else {
-        const speed = (enemy.speed * speedDelta) / 1000
+        const speed = Math.min((enemy.speed * speedDelta) / 1000, dist)
         const moveX = (dx / dist) * speed
         const moveY = (dy / dist) * speed
         enemy.sprite.x += moveX
@@ -2459,7 +2459,7 @@ export class GameScene extends Phaser.Scene {
         this.damageEnemy(enemy, proj.damage, proj.towerType)
         // Apply slow to all enemies in splash radius (ice tower AoE slow)
         if (proj.slow > 0 && enemy.sprite && enemy.sprite.active) {
-          enemy.speed = enemy.baseSpeed * proj.slow
+          enemy.speed = Math.min(enemy.speed, enemy.baseSpeed * proj.slow)
           enemy.slowTimer = Math.max(enemy.slowTimer, proj.slowDuration)
           enemy.sprite.setTint(0x00bcd4)
         }
@@ -2468,7 +2468,7 @@ export class GameScene extends Phaser.Scene {
       this.damageEnemy(proj.target, proj.damage, proj.towerType)
       // Slow effect on single target
       if (proj.slow > 0 && proj.target.sprite && proj.target.sprite.active) {
-        proj.target.speed = proj.target.baseSpeed * proj.slow
+        proj.target.speed = Math.min(proj.target.speed, proj.target.baseSpeed * proj.slow)
         proj.target.slowTimer = Math.max(proj.target.slowTimer, proj.slowDuration)
         proj.target.sprite.setTint(0x00bcd4)
       }
