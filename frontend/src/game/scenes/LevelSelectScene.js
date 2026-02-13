@@ -243,7 +243,7 @@ export class LevelSelectScene extends Phaser.Scene {
     backdrop.fillStyle(0x000000, 0.7)
     backdrop.fillRect(-cx, -cy, cx * 2, cy * 2)
     backdrop.setInteractive(new Phaser.Geom.Rectangle(-cx, -cy, cx * 2, cy * 2), Phaser.Geom.Rectangle.Contains)
-    backdrop.on('pointerdown', () => container.destroy())
+    backdrop.on('pointerdown', () => { container.destroy(); this.diffPopup = null })
     container.add(backdrop)
 
     // Panel — taller to fit all content
@@ -316,7 +316,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const closeBtn = this.add.text(panelW / 2 - 20, -panelH / 2 + 10, '\u2715', {
       fontSize: '16px', color: '#888', fontStyle: 'bold',
     }).setInteractive({ useHandCursor: true })
-    closeBtn.on('pointerdown', () => container.destroy())
+    closeBtn.on('pointerdown', () => { container.destroy(); this.diffPopup = null })
     closeBtn.on('pointerover', () => closeBtn.setColor('#e94560'))
     closeBtn.on('pointerout', () => closeBtn.setColor('#888'))
     container.add(closeBtn)

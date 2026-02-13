@@ -203,11 +203,13 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (pointer) => this.handleClick(pointer))
 
     // Keyboard shortcuts
-    this.input.keyboard.on('keydown-P', () => this.showPauseMenu())
+    this.input.keyboard.on('keydown-P', () => { if (!this.gameOver) this.showPauseMenu() })
     this.input.keyboard.on('keydown-SPACE', () => {
-      if (!this.waveActive && !this.gameOver) this.startNextWave()
+      if (!this.waveActive && !this.gameOver && !this.paused) this.startNextWave()
     })
     this.input.keyboard.on('keydown-ESC', () => {
+      if (this.gameOver) return
+      if (this.paused) { this.showPauseMenu(); return }
       this.selectedTowerType = null
       this.activeWeapon = null
       this.cellIndicator.setVisible(false)
@@ -2963,6 +2965,7 @@ export class GameScene extends Phaser.Scene {
     const overlay = this.add.graphics().setDepth(50)
     overlay.fillStyle(0x000000, 0.7)
     overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
+    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, this.cameras.main.width, this.cameras.main.height), Phaser.Geom.Rectangle.Contains)
 
     const bgKey = won ? 'victory_bg' : 'gameover_bg'
     if (this.textures.exists(bgKey)) {
