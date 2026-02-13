@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { LEVELS, TOWER_TYPES, ENEMY_TYPES } from '../maps/levels.js'
+import { loadSave, saveSave, unlockLevel, setLevelStars } from '../SaveManager.js'
 
 const TILE = 64
 
@@ -11,13 +12,35 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.levelIndex = data.levelIndex || 0
     this.levelData = LEVELS[this.levelIndex]
-    this.gold = this.levelData.startGold
-    this.lives = this.levelData.lives
+
+    // Load save and apply upgrades
+    this.saveData = loadSave()
+    const ups = this.saveData.upgrades
+
+    // Apply gold start boost (+20 gold per level)
+    this.gold = this.levelData.startGold + (ups.goldStartBoost || 0) * 20
+    // Apply base health boost (+1 life per level)
+    this.lives = this.levelData.lives + (ups.baseHealthBoost || 0)
+    this.startLives = this.lives
+
+    // Store boost multipliers for towers
+    this.boosts = {
+      damage: 1 + (ups.towerDamageBoost || 0) * 0.03,
+      fireRate: 1 - (ups.towerFireRateBoost || 0) * 0.03, // lower is faster
+      range: 1 + (ups.towerRangeBoost || 0) * 0.05,
+      aoe: 1 + (ups.towerAoeBoost || 0) * 0.05,
+      iceSlow: 1 + (ups.towerIcyBoost || 0) * 0.03,
+    }
+    // Gold wave bonus
+    this.goldWaveBonus = (ups.goldWaveBoost || 0) * 2
+
     this.currentWave = 0
     this.waveActive = false
     this.towers = []
     this.enemies = []
     this.projectiles = []
+    this.gemDrops = []
+    this.gemsCollected = 0
     this.selectedTowerType = null
     this.gameOver = false
     this.paused = false
@@ -164,16 +187,33 @@ export class GameScene extends Phaser.Scene {
     hudBg.fillStyle(0x000000, 0.6)
     hudBg.fillRect(0, 0, this.cameras.main.width, 36)
 
-    this.goldText = this.add.text(10, 8, '', {
+    // Gold icon + text
+    if (this.textures.exists('hud_gold')) {
+      this.add.image(18, 18, 'hud_gold').setDisplaySize(20, 20).setDepth(16)
+    }
+    this.goldText = this.add.text(32, 8, '', {
       fontSize: '16px', color: '#f1c40f', fontStyle: 'bold',
     }).setDepth(16)
 
-    this.livesText = this.add.text(180, 8, '', {
+    // Lives icon + text
+    if (this.textures.exists('hud_health')) {
+      this.add.image(148, 18, 'hud_health').setDisplaySize(20, 20).setDepth(16)
+    }
+    this.livesText = this.add.text(162, 8, '', {
       fontSize: '16px', color: '#e94560', fontStyle: 'bold',
     }).setDepth(16)
 
-    this.waveText = this.add.text(350, 8, '', {
+    // Wave text
+    this.waveText = this.add.text(280, 8, '', {
       fontSize: '16px', color: '#3498db', fontStyle: 'bold',
+    }).setDepth(16)
+
+    // Gem icon + text
+    if (this.textures.exists('hud_gem')) {
+      this.add.image(418, 18, 'hud_gem').setDisplaySize(20, 20).setDepth(16)
+    }
+    this.gemText = this.add.text(432, 8, '', {
+      fontSize: '16px', color: '#9b59b6', fontStyle: 'bold',
     }).setDepth(16)
 
     // Speed controls
@@ -298,11 +338,11 @@ export class GameScene extends Phaser.Scene {
       gridCol: col,
       gridRow: row,
       x, y,
-      damage: def.damage,
-      range: def.range,
-      fireRate: def.fireRate,
-      splash: def.splash || 0,
-      slow: def.slow || 0,
+      damage: Math.round(def.damage * this.boosts.damage),
+      range: Math.round(def.range * this.boosts.range),
+      fireRate: Math.round(def.fireRate * this.boosts.fireRate),
+      splash: def.splash ? Math.round(def.splash * this.boosts.aoe) : 0,
+      slow: def.slow ? Math.min(def.slow * this.boosts.iceSlow, 0.9) : 0,
       slowDuration: def.slowDuration || 0,
       projectileTexture: def.projectile,
       lastFired: 0,
@@ -352,11 +392,11 @@ export class GameScene extends Phaser.Scene {
         if (this.gold >= upgrade.cost) {
           this.gold -= upgrade.cost
           tower.level++
-          tower.damage = upgrade.damage
-          tower.range = upgrade.range || tower.range
-          tower.fireRate = upgrade.fireRate || tower.fireRate
-          if (upgrade.splash) tower.splash = upgrade.splash
-          if (upgrade.slow) tower.slow = upgrade.slow
+          tower.damage = Math.round(upgrade.damage * this.boosts.damage)
+          tower.range = Math.round((upgrade.range || tower.range) * this.boosts.range)
+          tower.fireRate = Math.round((upgrade.fireRate || tower.fireRate) * this.boosts.fireRate)
+          if (upgrade.splash) tower.splash = Math.round(upgrade.splash * this.boosts.aoe)
+          if (upgrade.slow) tower.slow = Math.min(upgrade.slow * this.boosts.iceSlow, 0.9)
           if (upgrade.slowDuration) tower.slowDuration = upgrade.slowDuration
           // Swap tower sprite to upgraded version
           const towerDef = TOWER_TYPES[tower.type]
@@ -579,6 +619,11 @@ export class GameScene extends Phaser.Scene {
       this.waveActive = false
       this.currentWave++
 
+      // Gold wave bonus from shop upgrades
+      if (this.goldWaveBonus > 0) {
+        this.gold += this.goldWaveBonus
+      }
+
       if (this.currentWave >= this.levelData.waves.length) {
         this.handleGameOver(true)
       } else {
@@ -632,9 +677,79 @@ export class GameScene extends Phaser.Scene {
     enemy.hp -= damage
     if (enemy.hp <= 0) {
       this.gold += enemy.reward
+      // Drop gems (small chance per kill, guaranteed on bosses)
+      this.dropGem(enemy.sprite.x, enemy.sprite.y, enemy.reward)
       this.removeEnemy(enemy)
       this.updateHUD()
     }
+  }
+
+  dropGem(x, y, reward) {
+    // Gem drop chance scales with enemy value: weak=20%, strong=50%, boss=100%
+    const chance = reward >= 30 ? 1.0 : reward >= 15 ? 0.5 : 0.2
+    if (Math.random() > chance) return
+
+    const gemValue = reward >= 30 ? 3 : reward >= 15 ? 2 : 1
+    const colors = [0x9b59b6, 0x3498db, 0x2ecc71, 0xe74c3c, 0xf1c40f]
+    const color = colors[Math.floor(Math.random() * colors.length)]
+
+    const gem = this.add.graphics().setDepth(12)
+    gem.fillStyle(color, 0.9)
+    // Diamond shape
+    gem.fillPoints([
+      { x: 0, y: -6 },
+      { x: 5, y: 0 },
+      { x: 0, y: 6 },
+      { x: -5, y: 0 },
+    ], true)
+    gem.setPosition(x, y)
+
+    // Float up animation
+    this.tweens.add({
+      targets: gem,
+      y: y - 20,
+      alpha: { from: 1, to: 0.7 },
+      duration: 500,
+      ease: 'Power1',
+    })
+
+    const gemDrop = { graphics: gem, x, y: y - 20, value: gemValue, timer: 5000 }
+    this.gemDrops.push(gemDrop)
+
+    // Make clickable — tapping collects the gem
+    const zone = this.add.zone(x, y - 10, 30, 30).setInteractive().setDepth(13)
+    zone.on('pointerdown', () => {
+      this.collectGem(gemDrop)
+      zone.destroy()
+    })
+    gemDrop.zone = zone
+
+    // Auto-collect after 3 seconds
+    this.time.delayedCall(3000, () => {
+      if (gemDrop.graphics.active) {
+        this.collectGem(gemDrop)
+        if (gemDrop.zone) gemDrop.zone.destroy()
+      }
+    })
+  }
+
+  collectGem(gemDrop) {
+    if (!gemDrop.graphics.active) return
+    this.gemsCollected += gemDrop.value
+
+    // Float-up collect animation
+    this.tweens.add({
+      targets: gemDrop.graphics,
+      y: gemDrop.graphics.y - 30,
+      alpha: 0,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      duration: 300,
+      onComplete: () => gemDrop.graphics.destroy(),
+    })
+
+    this.gemDrops = this.gemDrops.filter(g => g !== gemDrop)
+    this.updateHUD()
   }
 
   removeEnemy(enemy) {
@@ -651,35 +766,80 @@ export class GameScene extends Phaser.Scene {
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
 
+    // Calculate stars
+    let stars = 0
+    if (won) {
+      const lifeRatio = this.lives / this.startLives
+      stars = lifeRatio >= 1 ? 3 : lifeRatio >= 0.5 ? 2 : 1
+    }
+
+    // Save progress
+    if (won) {
+      unlockLevel(this.levelIndex + 1)
+      setLevelStars(this.levelIndex, stars)
+    }
+    // Always save gems earned this level
+    if (this.gemsCollected > 0) {
+      const save = loadSave()
+      save.gems += this.gemsCollected
+      saveSave(save)
+    }
+
+    // Update registry for level select
+    const save = loadSave()
+    this.registry.set('gameState', { levelsUnlocked: save.levelsUnlocked })
+
+    // Overlay
     const overlay = this.add.graphics().setDepth(50)
     overlay.fillStyle(0x000000, 0.7)
     overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
 
+    // Background image
+    const bgKey = won ? 'victory_bg' : 'gameover_bg'
+    if (this.textures.exists(bgKey)) {
+      this.add.image(cx, cy, bgKey)
+        .setDisplaySize(400, 300).setDepth(50).setAlpha(0.4)
+    }
+
     const title = won ? 'VICTORY!' : 'DEFEAT'
     const color = won ? '#2ecc71' : '#e74c3c'
 
-    this.add.text(cx, cy - 40, title, {
+    this.add.text(cx, cy - 70, title, {
       fontSize: '48px', color, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51)
 
+    // Star display (for victories)
     if (won) {
-      // Unlock next level
-      const state = this.registry.get('gameState') || {}
-      state.levelsUnlocked = Math.max(state.levelsUnlocked || 1, this.levelIndex + 2)
-      state.currentLevel = this.levelIndex + 1
-      state.gold = this.gold
-      this.registry.set('gameState', state)
+      const starY = cy - 30
+      for (let i = 0; i < 3; i++) {
+        const starX = cx - 40 + i * 40
+        const filled = i < stars
+        this.add.text(starX, starY, filled ? '\u2605' : '\u2606', {
+          fontSize: '32px',
+          color: filled ? '#f1c40f' : '#555',
+          stroke: '#000',
+          strokeThickness: 2,
+        }).setOrigin(0.5).setDepth(51)
+      }
     }
 
-    const menuBtn = this.add.text(cx - 80, cy + 30, 'Menu', {
+    // Gem count
+    const gemSave = loadSave()
+    this.add.text(cx, cy + 5, `Gems earned: ${this.gemsCollected} | Total: ${gemSave.gems}`, {
+      fontSize: '14px', color: '#9b59b6', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(51)
+
+    // Buttons
+    const menuBtn = this.add.text(cx - 80, cy + 45, 'Menu', {
       fontSize: '20px', color: '#fff', backgroundColor: '#16213e',
       padding: { x: 16, y: 8 },
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     menuBtn.on('pointerdown', () => this.scene.start('LevelSelectScene'))
 
     if (won && this.levelIndex + 1 < LEVELS.length) {
-      const nextBtn = this.add.text(cx + 80, cy + 30, 'Next', {
+      const nextBtn = this.add.text(cx + 80, cy + 45, 'Next', {
         fontSize: '20px', color: '#fff', backgroundColor: '#e94560',
         padding: { x: 16, y: 8 },
       }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
@@ -688,7 +848,7 @@ export class GameScene extends Phaser.Scene {
       })
     }
 
-    const retryBtn = this.add.text(cx, cy + 80, 'Retry', {
+    const retryBtn = this.add.text(cx, cy + 90, 'Retry', {
       fontSize: '16px', color: '#888',
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
     retryBtn.on('pointerdown', () => {
@@ -697,19 +857,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   updateHUD() {
-    this.goldText.setText(`Gold: ${this.gold}`)
-    this.livesText.setText(`Lives: ${this.lives}`)
-    this.waveText.setText(`Wave: ${this.currentWave + 1}/${this.levelData.waves.length}`)
-    this.updateGameState()
-  }
-
-  updateGameState() {
-    this.registry.set('gameState', {
-      currentLevel: this.levelIndex + 1,
-      gold: this.gold,
-      lives: this.lives,
-      wave: this.currentWave + 1,
-      levelsUnlocked: this.registry.get('gameState')?.levelsUnlocked || 1,
-    })
+    this.goldText.setText(`${this.gold}`)
+    this.livesText.setText(`${this.lives}`)
+    this.waveText.setText(`Wave ${this.currentWave + 1}/${this.levelData.waves.length}`)
+    this.gemText.setText(`${this.gemsCollected}`)
   }
 }

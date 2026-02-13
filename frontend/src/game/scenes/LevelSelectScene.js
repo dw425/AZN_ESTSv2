@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { LEVELS } from '../maps/levels.js'
+import { loadSave } from '../SaveManager.js'
 
 export class LevelSelectScene extends Phaser.Scene {
   constructor() {
@@ -33,8 +34,18 @@ export class LevelSelectScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5)
 
-    // Load progress
-    const progress = this.registry.get('gameState')?.levelsUnlocked || 1
+    // Load progress from persistent save
+    const save = loadSave()
+    const progress = save.levelsUnlocked || 1
+
+    // Show gem count
+    if (this.textures.exists('hud_gem')) {
+      this.add.image(w - 60, 35, 'hud_gem').setDisplaySize(20, 20).setDepth(5)
+    }
+    this.add.text(w - 45, 27, `${save.gems}`, {
+      fontSize: '16px', color: '#9b59b6', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setDepth(5)
 
     // Layout: center the level cards
     const cardW = 120
@@ -97,8 +108,20 @@ export class LevelSelectScene extends Phaser.Scene {
         strokeThickness: 2,
       }).setOrigin(0.5).setDepth(2)
 
-      // Completed indicator
-      if (i < progress - 1) {
+      // Star display for completed levels
+      const starCount = save.levelStars[String(i)] || 0
+      if (starCount > 0) {
+        let starStr = ''
+        for (let s = 0; s < 3; s++) {
+          starStr += s < starCount ? '\u2605' : '\u2606'
+        }
+        this.add.text(x, y + 55, starStr, {
+          fontSize: '12px',
+          color: '#f1c40f',
+          stroke: '#000',
+          strokeThickness: 1,
+        }).setOrigin(0.5).setDepth(2)
+      } else if (i < progress - 1) {
         this.add.text(x, y + 55, 'CLEAR', {
           fontSize: '10px',
           color: '#2ecc71',
@@ -132,5 +155,17 @@ export class LevelSelectScene extends Phaser.Scene {
     backBtn.on('pointerdown', () => this.scene.start('MenuScene'))
     backBtn.on('pointerover', () => backBtn.setColor('#e94560'))
     backBtn.on('pointerout', () => backBtn.setColor('#aaa'))
+
+    // Shop button
+    const shopBtn = this.add.text(w - 80, h - 35, 'Shop', {
+      fontSize: '20px',
+      color: '#9b59b6',
+      fontStyle: 'bold',
+      stroke: '#000',
+      strokeThickness: 2,
+    }).setInteractive({ useHandCursor: true })
+    shopBtn.on('pointerdown', () => this.scene.start('ShopScene'))
+    shopBtn.on('pointerover', () => shopBtn.setColor('#c39bd3'))
+    shopBtn.on('pointerout', () => shopBtn.setColor('#9b59b6'))
   }
 }
