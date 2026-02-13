@@ -63,6 +63,9 @@ export class GameScene extends Phaser.Scene {
       gas: 1 + (ups.gasCloudBoost || 0),
     }
     this.activeWeapon = null
+    this.manualTarget = null
+    this.targetIndicator = null
+    this._goldDeposits = []
 
     // Tracking for bonus missions and stats
     this.towersBuilt = 0
@@ -115,6 +118,8 @@ export class GameScene extends Phaser.Scene {
       })
       this.gemDrops = []
       if (this.towerMenu) { try { this.towerMenu.destroy() } catch (e) {} }
+      if (this.targetIndicator) { try { this.targetIndicator.destroy() } catch (e) {} }
+      this._goldDeposits = []
     })
 
     this.drawMap()
@@ -754,10 +759,10 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 2,
         backgroundColor: '#16213e80',
         padding: { x: 6, y: 4 },
-      }).setDepth(20).setInteractive({ useHandCursor: charges > 0 })
+      }).setDepth(20).setInteractive({ useHandCursor: true })
 
-      if (charges > 0) {
-        btn.on('pointerdown', () => {
+      btn.on('pointerdown', () => {
+        if (this.weaponCharges[wpn.key] > 0) {
           if (this.activeWeapon === wpn.key) {
             this.activeWeapon = null
           } else {
@@ -766,11 +771,18 @@ export class GameScene extends Phaser.Scene {
             this.updateBuildHighlights()
           }
           this.updateWeaponHighlights()
-        })
-      }
+        } else {
+          // Recharge with gems when depleted
+          this.rechargeWeapon(wpn.key)
+        }
+      })
 
       this.weaponButtons[wpn.key] = btn
     })
+
+    // Store weapon colors for updateWeaponButtons
+    this.weaponColors = {}
+    weapons.forEach(wpn => { this.weaponColors[wpn.key] = wpn.color })
   }
 
   updateWeaponHighlights() {
@@ -881,15 +893,41 @@ export class GameScene extends Phaser.Scene {
 
     this.activeWeapon = null
     this.updateWeaponHighlights()
+    this.updateWeaponButtons()
+  }
+
+  updateWeaponButtons() {
     Object.entries(this.weaponButtons).forEach(([key, btn]) => {
       const charges = this.weaponCharges[key]
       const symbols = { powderKeg: '\u2620', mine: '\u26A0', gas: '\u2601' }
-      btn.setText(`${symbols[key]}${charges}`)
-      if (charges <= 0) {
-        btn.setColor('#555')
-        btn.disableInteractive()
+      if (charges > 0) {
+        btn.setText(`${symbols[key]}${charges}`)
+        btn.setColor(this.weaponColors[key] || '#fff')
+        btn.setInteractive({ useHandCursor: true })
+      } else {
+        // Show gem recharge option — spend gems for another charge
+        const gemCost = { powderKeg: 3, mine: 2, gas: 2 }
+        btn.setText(`${symbols[key]}+\u25C6${gemCost[key]}`)
+        btn.setColor('#9b59b6')
+        btn.setInteractive({ useHandCursor: true })
       }
     })
+  }
+
+  rechargeWeapon(weaponKey) {
+    const gemCosts = { powderKeg: 3, mine: 2, gas: 2 }
+    const cost = gemCosts[weaponKey]
+    if (this.gemsCollected >= cost) {
+      this.gemsCollected -= cost
+      this.weaponCharges[weaponKey]++
+      this.updateWeaponButtons()
+      this.updateHUD()
+      this.playSfx('sfx_chime2', 0.3)
+      this.showFloatingText(this.cameras.main.centerX, this.cameras.main.height - 115, `Recharged! -${cost} gems`, '#9b59b6')
+    } else {
+      this.showFloatingText(this.cameras.main.centerX, this.cameras.main.height - 115, 'Not enough gems!', '#e74c3c')
+      this.playSfx('sfx_beep', 0.3)
+    }
   }
 
   handleClick(pointer) {
@@ -900,6 +938,15 @@ export class GameScene extends Phaser.Scene {
     if (this.activeWeapon) {
       this.deployWeapon(pointer.x, pointer.y)
       return
+    }
+
+    // Manual targeting — click on enemy to focus tower fire (like original APK)
+    if (!this.selectedTowerType) {
+      const clickedEnemy = this.findEnemyAt(pointer.x, pointer.y)
+      if (clickedEnemy) {
+        this.setManualTarget(clickedEnemy)
+        return
+      }
     }
 
     const col = Math.floor(pointer.x / TILE)
@@ -913,6 +960,11 @@ export class GameScene extends Phaser.Scene {
     if (existingTower) {
       this.showTowerMenu(existingTower)
       return
+    }
+
+    // Clear manual target when clicking empty ground
+    if (this.manualTarget) {
+      this.clearManualTarget()
     }
 
     // Place new tower
@@ -930,6 +982,47 @@ export class GameScene extends Phaser.Scene {
         )
         this.playSfx('sfx_beep', 0.3)
       }
+    }
+  }
+
+  findEnemyAt(x, y) {
+    let nearest = null
+    let nearDist = 30 // Click tolerance radius
+    this.enemies.forEach(enemy => {
+      if (!enemy.sprite.active) return
+      const dx = enemy.sprite.x - x
+      const dy = enemy.sprite.y - y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < nearDist) {
+        nearest = enemy
+        nearDist = dist
+      }
+    })
+    return nearest
+  }
+
+  setManualTarget(enemy) {
+    this.manualTarget = enemy
+    // Show target indicator
+    if (this.targetIndicator) this.targetIndicator.destroy()
+    if (this.textures.exists('hud_target_arrow')) {
+      this.targetIndicator = this.add.image(enemy.sprite.x, enemy.sprite.y - 25, 'hud_target_arrow')
+        .setDisplaySize(16, 16).setDepth(15)
+    } else {
+      this.targetIndicator = this.add.text(enemy.sprite.x, enemy.sprite.y - 25, '\u25BC', {
+        fontSize: '16px', color: '#e94560', fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(15)
+    }
+    this.showFloatingText(enemy.sprite.x, enemy.sprite.y - 30, 'TARGET!', '#e94560')
+    this.showTutorial('Tut_ManualTarget')
+  }
+
+  clearManualTarget() {
+    this.manualTarget = null
+    if (this.targetIndicator) {
+      this.targetIndicator.destroy()
+      this.targetIndicator = null
     }
   }
 
@@ -1004,16 +1097,25 @@ export class GameScene extends Phaser.Scene {
       }
     })
 
-    // Check gold deposits (adjacent = mine it for bonus gold)
+    // Check gold deposits — activate mining (periodic income, like original APK)
     this.specialTiles.deposits.forEach(dep => {
       if (dep.mined) return
       if (Math.abs(dep.c - col) <= 1 && Math.abs(dep.r - row) <= 1) {
         dep.mined = true
-        const goldBonus = 50
-        this.gold += goldBonus
-        this.showFloatingText(dep.c * TILE + TILE / 2, dep.r * TILE + TILE / 2, `+${goldBonus} gold!`, '#f1c40f')
-        if (dep.sprite) { try { dep.sprite.destroy() } catch (e) {} }
-        this.playSfx('sfx_coin_accumulate')
+        // Start periodic gold generation instead of one-time bonus
+        if (!this._goldDeposits) this._goldDeposits = []
+        this._goldDeposits.push({
+          x: dep.c * TILE + TILE / 2,
+          y: dep.r * TILE + TILE / 2,
+          sprite: dep.sprite,
+          goldPerTick: 5,
+          interval: 3000, // 5 gold every 3 seconds
+          goldRemaining: 200, // Total gold available from this deposit
+          timer: 1000, // First payout after 1 second
+          active: true,
+        })
+        this.showFloatingText(dep.c * TILE + TILE / 2, dep.r * TILE + TILE / 2, 'MINING!', '#f1c40f')
+        this.playSfx('sfx_dig')
         this.showTutorial('Tut_MineGoldDeposit')
       }
     })
@@ -1430,6 +1532,35 @@ export class GameScene extends Phaser.Scene {
       }
     })
 
+    // Update manual target indicator position
+    if (this.manualTarget) {
+      if (!this.manualTarget.sprite.active || this.manualTarget.hp <= 0) {
+        this.clearManualTarget()
+      } else if (this.targetIndicator) {
+        this.targetIndicator.setPosition(this.manualTarget.sprite.x, this.manualTarget.sprite.y - 25)
+      }
+    }
+
+    // Process gold deposit income (periodic gold generation)
+    if (this._goldDeposits) {
+      this._goldDeposits.forEach(dep => {
+        if (!dep.active) return
+        dep.timer -= speedDelta
+        if (dep.timer <= 0) {
+          dep.timer += dep.interval
+          dep.goldRemaining -= dep.goldPerTick
+          if (dep.goldRemaining <= 0) {
+            dep.active = false
+            if (dep.sprite) { try { dep.sprite.setAlpha(0.3) } catch (e) {} }
+            return
+          }
+          this.gold += dep.goldPerTick
+          this.showFloatingText(dep.x, dep.y - 10, `+${dep.goldPerTick}`, '#f1c40f')
+          this.updateHUD()
+        }
+      })
+    }
+
     // Gel Cube tower damage + enemy melee attacks
     this.enemies.forEach(enemy => {
       if (!enemy.sprite.active) return
@@ -1486,27 +1617,39 @@ export class GameScene extends Phaser.Scene {
       if (tower.hp <= 0) return
       if (time - tower.lastFired < tower.fireRate / this.gameSpeed) return
 
-      // Target priority: "first" — the enemy furthest along the path (like original game)
+      // Manual target override — if player has clicked an enemy, prioritize it
       let bestTarget = null
-      let bestPriority = -1
-
       const canTargetFlying = tower.type === 'scout' || tower.type === 'storm'
-      this.enemies.forEach(enemy => {
-        if (!enemy.sprite.active) return
-        if (enemy.flying && !canTargetFlying) return // Flying: only scout/storm can target
-        const dx = enemy.sprite.x - tower.x
-        const dy = enemy.sprite.y - tower.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist <= tower.range) {
-          // Priority = waypointIndex (higher = further along path)
-          // Break ties by distance to next waypoint (closer = further along)
-          const priority = enemy.waypointIndex * 10000 - dist
-          if (priority > bestPriority) {
-            bestTarget = enemy
-            bestPriority = priority
+
+      if (this.manualTarget && this.manualTarget.sprite.active) {
+        const mt = this.manualTarget
+        if (!mt.flying || canTargetFlying) {
+          const dx = mt.sprite.x - tower.x
+          const dy = mt.sprite.y - tower.y
+          if (Math.sqrt(dx * dx + dy * dy) <= tower.range) {
+            bestTarget = mt
           }
         }
-      })
+      }
+
+      // Default targeting: "first" — the enemy furthest along the path
+      if (!bestTarget) {
+        let bestPriority = -1
+        this.enemies.forEach(enemy => {
+          if (!enemy.sprite.active) return
+          if (enemy.flying && !canTargetFlying) return
+          const dx = enemy.sprite.x - tower.x
+          const dy = enemy.sprite.y - tower.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist <= tower.range) {
+            const priority = enemy.waypointIndex * 10000 - dist
+            if (priority > bestPriority) {
+              bestTarget = enemy
+              bestPriority = priority
+            }
+          }
+        })
+      }
 
       if (bestTarget) {
         if (tower.type === 'scout') {
@@ -2120,6 +2263,8 @@ export class GameScene extends Phaser.Scene {
     try { if (enemy.namePlate) enemy.namePlate.destroy() } catch (e) {}
     // Clear scout tower lastTarget references to prevent memory leaks
     this.towers.forEach(t => { if (t.lastTarget === enemy) t.lastTarget = null })
+    // Clear manual target if this enemy was targeted
+    if (this.manualTarget === enemy) this.clearManualTarget()
     this.enemies = this.enemies.filter(e => e !== enemy)
   }
 
