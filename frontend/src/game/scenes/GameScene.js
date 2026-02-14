@@ -1244,25 +1244,13 @@ export class GameScene extends Phaser.Scene {
     const x = col * TILE + TILE / 2
     const y = row * TILE + TILE / 2
 
-    const sprite = this.add.sprite(x, y, def.texture).setDepth(4)
+    const sprite = this.add.image(x, y, def.texture).setDepth(4)
     // Scale proportionally to fit within tile (maintain aspect ratio to avoid distortion)
     const maxTowerSize = 58
     const tScale = maxTowerSize / Math.max(sprite.width, sprite.height)
     // Placement bounce animation
     sprite.setScale(0)
     this.tweens.add({ targets: sprite, scaleX: tScale, scaleY: tScale, duration: 300, ease: 'Back.easeOut' })
-    // Rescale on animation frame change — fire animation frames are 256x256 while base sprites
-    // are 60-110px; without this, the sprite pops to 3-4x size during fire animations
-    sprite.on('animationupdate', () => {
-      const fw = sprite.frame.realWidth || sprite.frame.width
-      const fh = sprite.frame.realHeight || sprite.frame.height
-      sprite.setScale(maxTowerSize / Math.max(fw, fh))
-    })
-    sprite.on('animationcomplete', () => {
-      const fw = sprite.frame.realWidth || sprite.frame.width
-      const fh = sprite.frame.realHeight || sprite.frame.height
-      sprite.setScale(maxTowerSize / Math.max(fw, fh))
-    })
     this.towerGroup.add(sprite)
 
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
@@ -2403,23 +2391,6 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10)
     this.projectileGroup.add(sprite)
 
-    // Tower fire animation
-    const fireAnimKeys = {
-      ballista: ['ballista_fire', 'ballista_fire', 'ballista_3_fire'],
-      cannon: ['cannon_fire', 'cannon_2_fire', 'cannon_3_fire'],
-      catapult: ['catapult_fire', 'catapult_2_fire', 'catapult_3_fire'],
-      scout: [null, null, null],
-      storm: [null, 'storm_2_fire', 'storm_3_fire'],
-      winter: ['winter_fire', 'winter_2_fire', 'winter_3_fire'],
-    }
-    const animArr = fireAnimKeys[tower.type]
-    if (animArr && tower.sprite.play) {
-      const animKey = animArr[tower.level]
-      if (animKey && this.anims.exists(animKey)) {
-        try { tower.sprite.play(animKey) } catch (e) {}
-      }
-    }
-
     // Tower fire SFX
     const towerSfx = {
       ballista: ['sfx_ballista1', 'sfx_ballista2', 'sfx_ballista3'],
@@ -2464,12 +2435,6 @@ export class GameScene extends Phaser.Scene {
   fireChainLightning(tower, primary) {
     if (primary.hp <= 0) return // Target already dead
 
-    // Play fire animation for storm tower
-    const stormFireAnims = [null, 'storm_2_fire', 'storm_3_fire']
-    const stormAnimKey = stormFireAnims[tower.level]
-    if (stormAnimKey && this.anims.exists(stormAnimKey) && tower.sprite.play) {
-      try { tower.sprite.play(stormAnimKey) } catch (e) {}
-    }
     this.playSfx('sfx_lightning', 0.25)
 
     // Handle chest target — direct hit only, no chain
