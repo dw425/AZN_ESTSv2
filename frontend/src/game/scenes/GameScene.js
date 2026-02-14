@@ -1411,9 +1411,10 @@ export class GameScene extends Phaser.Scene {
       if (this.textures.exists('hud_upgrade')) {
         menu.add(this.add.image(-55, yOffset + 7, 'hud_upgrade').setDisplaySize(14, 14))
       }
+      const canAffordUpgrade = this.gold >= upgrade.cost
       const upgradeBtn = this.add.text(-40, yOffset, `Upgrade $${upgrade.cost}`, {
-        fontSize: '11px', color: '#2ecc71', fontStyle: 'bold',
-      }).setInteractive({ useHandCursor: true })
+        fontSize: '11px', color: canAffordUpgrade ? '#2ecc71' : '#555', fontStyle: 'bold',
+      }).setInteractive({ useHandCursor: canAffordUpgrade })
       upgradeBtn.on('pointerdown', () => {
         if (this.gold >= upgrade.cost) {
           this.gold -= upgrade.cost
@@ -1456,6 +1457,9 @@ export class GameScene extends Phaser.Scene {
           this._menuTower = null
           if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
           this.rangeIndicator.setVisible(false)
+        } else {
+          this.showFloatingText(tower.x, tower.y - 40, 'Not enough gold!', '#e74c3c')
+          this.playSfx('sfx_beep', 0.3)
         }
       })
       menu.add(upgradeBtn)
@@ -1466,9 +1470,10 @@ export class GameScene extends Phaser.Scene {
       if (this.textures.exists('hud_repair')) {
         menu.add(this.add.image(-55, yOffset + 7, 'hud_repair').setDisplaySize(14, 14))
       }
+      const canAffordRepair = this.gold >= repairCost
       const repairBtn = this.add.text(-40, yOffset, `Repair $${repairCost}`, {
-        fontSize: '11px', color: '#3498db', fontStyle: 'bold',
-      }).setInteractive({ useHandCursor: true })
+        fontSize: '11px', color: canAffordRepair ? '#3498db' : '#555', fontStyle: 'bold',
+      }).setInteractive({ useHandCursor: canAffordRepair })
       repairBtn.on('pointerdown', () => {
         if (this.gold >= repairCost) {
           this.gold -= repairCost
@@ -1482,6 +1487,9 @@ export class GameScene extends Phaser.Scene {
           this._menuTower = null
           if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
           this.rangeIndicator.setVisible(false)
+        } else {
+          this.showFloatingText(tower.x, tower.y - 40, 'Not enough gold!', '#e74c3c')
+          this.playSfx('sfx_beep', 0.3)
         }
       })
       menu.add(repairBtn)
@@ -1767,7 +1775,7 @@ export class GameScene extends Phaser.Scene {
 
     // Move enemies
     this.enemies.forEach(enemy => {
-      if (!enemy.sprite.active) return
+      if (!enemy.sprite.active || this.gameOver) return
 
       // Handle slow effect
       if (enemy.slowTimer > 0) {
@@ -2574,6 +2582,7 @@ export class GameScene extends Phaser.Scene {
       if (proj.slow > 0 && proj.target.sprite && proj.target.sprite.active) {
         proj.target.speed = Math.min(proj.target.speed, proj.target.baseSpeed * proj.slow)
         proj.target.slowTimer = Math.max(proj.target.slowTimer, proj.slowDuration)
+        proj.target._iceTinted = true
         proj.target.sprite.setTint(0x00bcd4)
       }
     }
@@ -3101,10 +3110,12 @@ export class GameScene extends Phaser.Scene {
     this.rangeIndicator.setVisible(false)
     this.cellIndicator.setVisible(false)
     this.cellNoIndicator.setVisible(false)
-    // Clean up gem drop zones
+    // Clean up gem drops (both graphics and interactive zones)
     this.gemDrops.forEach(g => {
+      try { if (g.graphics && g.graphics.active) g.graphics.destroy() } catch (e) {}
       try { if (g.zone) g.zone.destroy() } catch (e) {}
     })
+    this.gemDrops = []
 
     const cx = this.cameras.main.centerX
     const cy = this.cameras.main.centerY
