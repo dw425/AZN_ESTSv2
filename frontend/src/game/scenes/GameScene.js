@@ -3140,35 +3140,8 @@ export class GameScene extends Phaser.Scene {
     // Check bonus mission
     const missionIdx = this.levelData.bonusMission
     if (missionIdx !== undefined && won) {
-      const mission = BONUS_MISSIONS[missionIdx]
-      if (mission) {
-        let completed = false
-        const check = mission.check
-        if (check === 'always') completed = true
-        if (check === 'gems_3' && this.gemsCollected >= 3) completed = true
-        if (check === 'gems_20' && this.gemsCollected >= 20) completed = true
-        if (check === 'gems_25' && this.gemsCollected >= 25) completed = true
-        if (check === 'gems_35' && this.gemsCollected >= 35) completed = true
-        if (check === 'gold_400' && this.peakGold >= 400) completed = true
-        if (check === 'gold_500' && this.peakGold >= 500) completed = true
-        if (check === 'sell_5' && this.towersSold >= 5) completed = true
-        if (check === 'build_storm_3' && this.stormTowersBuilt >= 3) completed = true
-        if (check === 'build_15' && this.towersBuilt >= 15) completed = true
-        if (check === 'no_weapons' && !this.weaponsUsed) completed = true
-        if (check === 'no_ice' && this.iceTowersBuilt === 0) completed = true
-        if (check === 'kill_boss' && this.bossKilled) completed = true
-        if (check === 'keg_multi_3' && this.kegMultiKills >= 1) completed = true
-        if (check === 'gas_multi_5' && this.gasMultiHits >= 1) completed = true
-        if (check === 'scout_kill_ogre' && this.scoutKilledOgre) completed = true
-        if (check === 'upgrade_catapult_3' && this.maxCatapultLevel >= 3) completed = true
-        if (check === 'repair_3' && this.towersRepaired >= 3) completed = true
-        if (check === 'scout_kills_20' && this.scoutKills >= 20) completed = true
-        if (check === 'all_gold_deposits') {
-          completed = this.specialTiles.deposits.length > 0 && this.specialTiles.deposits.every(d => d.mined)
-        }
-        if (completed) {
-          completeBonusMission(`${this.levelIndex}_${this.difficulty}`)
-        }
+      if (this.checkBonusMission()) {
+        completeBonusMission(`${this.levelIndex}_${this.difficulty}`)
       }
     }
 
@@ -3319,6 +3292,20 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Update bonus mission indicator color (gold → green when met, red when failed)
+    if (this.bonusMissionText && this.levelData.bonusMission !== undefined) {
+      const met = this.checkBonusMission()
+      if (met && !this._bonusMissionMet) {
+        this._bonusMissionMet = true
+        this.bonusMissionText.setColor('#2ecc71').setAlpha(0.8)
+        this.bonusMissionText.setText(this.bonusMissionText.text.replace('\u2606', '\u2605'))
+      } else if (!met && this._bonusMissionMet) {
+        this._bonusMissionMet = false
+        this.bonusMissionText.setColor('#e74c3c').setAlpha(0.5)
+        this.bonusMissionText.setText(this.bonusMissionText.text.replace('\u2605', '\u2606'))
+      }
+    }
+
     // Update build panel affordability — gray out towers player can't afford
     if (this.buildIcons) {
       this.buildIcons.forEach(icon => {
@@ -3392,6 +3379,34 @@ export class GameScene extends Phaser.Scene {
     }
 
     return { enemies: groups, boss: isBoss }
+  }
+
+  checkBonusMission() {
+    const mIdx = this.levelData.bonusMission
+    const mission = BONUS_MISSIONS[mIdx]
+    if (!mission) return false
+    const check = mission.check
+    if (check === 'always') return true
+    if (check === 'gems_3') return this.gemsCollected >= 3
+    if (check === 'gems_20') return this.gemsCollected >= 20
+    if (check === 'gems_25') return this.gemsCollected >= 25
+    if (check === 'gems_35') return this.gemsCollected >= 35
+    if (check === 'gold_400') return this.peakGold >= 400
+    if (check === 'gold_500') return this.peakGold >= 500
+    if (check === 'sell_5') return this.towersSold >= 5
+    if (check === 'build_storm_3') return this.stormTowersBuilt >= 3
+    if (check === 'build_15') return this.towersBuilt >= 15
+    if (check === 'no_weapons') return !this.weaponsUsed
+    if (check === 'no_ice') return this.iceTowersBuilt === 0
+    if (check === 'kill_boss') return this.bossKilled
+    if (check === 'keg_multi_3') return this.kegMultiKills >= 1
+    if (check === 'gas_multi_5') return this.gasMultiHits >= 1
+    if (check === 'scout_kill_ogre') return this.scoutKilledOgre
+    if (check === 'upgrade_catapult_3') return this.maxCatapultLevel >= 3
+    if (check === 'repair_3') return this.towersRepaired >= 3
+    if (check === 'scout_kills_20') return this.scoutKills >= 20
+    if (check === 'all_gold_deposits') return this.specialTiles.deposits.length > 0 && this.specialTiles.deposits.every(d => d.mined)
+    return false
   }
 
   updateWavePreview() {
