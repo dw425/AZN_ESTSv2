@@ -11,12 +11,13 @@ export class SettingsScene extends Phaser.Scene {
     const h = this.cameras.main.height
     const cx = w / 2
 
-    this.events.on('shutdown', () => {
-      saveSave(this.save)
+    this.events.once('shutdown', () => {
+      if (!this._wasReset) saveSave(this.save)
       this.tweens.killAll()
       this.time.removeAllEvents()
     })
     this._confirmReset = false
+    this._wasReset = false
 
     // Background
     if (this.textures.exists('loading_bg')) {
@@ -98,6 +99,7 @@ export class SettingsScene extends Phaser.Scene {
     resetAllBtn.on('pointerdown', () => {
       if (this._confirmReset) {
         localStorage.removeItem(SAVE_KEY)
+        this._wasReset = true
         this.showFloatingText(cx, y - 20, 'Progress Reset! Restarting...', '#e74c3c')
         this.time.delayedCall(1500, () => this.scene.start('MenuScene'))
       } else {

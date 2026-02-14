@@ -13,7 +13,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const cx = w / 2
 
     // Clean up on scene shutdown
-    this.events.on('shutdown', () => {
+    this.events.once('shutdown', () => {
       this.tweens.killAll()
       this.time.removeAllEvents()
     })

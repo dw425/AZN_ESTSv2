@@ -114,7 +114,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     // Clean up on scene shutdown to prevent memory leaks and freezes
-    this.events.on('shutdown', () => {
+    this.events.once('shutdown', () => {
       this.stopMusic()
       this.tweens.killAll()
       this.time.removeAllEvents()
@@ -353,6 +353,15 @@ export class GameScene extends Phaser.Scene {
           queue.push([nr, nc])
         }
       }
+    }
+
+    // Guard: if BFS didn't find the exit, fall back to start→exit straight line
+    if (endRow < 0 || endCol < 0) {
+      console.warn('BFS could not find exit — using fallback path')
+      return [
+        { x: startCol * TILE + TILE / 2, y: startRow * TILE + TILE / 2 },
+        { x: 7 * TILE + TILE / 2, y: 9 * TILE + TILE / 2 },
+      ]
     }
 
     const cells = []
@@ -2025,7 +2034,7 @@ export class GameScene extends Phaser.Scene {
         let bestScore = -Infinity
         const mode = tower.targetMode || 'first'
         this.enemies.forEach(enemy => {
-          if (!enemy.sprite.active) return
+          if (!enemy.sprite.active || enemy.hp <= 0) return
           if (enemy.flying && !canTargetFlying) return
           const dx = enemy.sprite.x - tower.x
           const dy = enemy.sprite.y - tower.y
@@ -2874,7 +2883,9 @@ export class GameScene extends Phaser.Scene {
     } else if (enemy.bossAbility === 'fire_breath') {
       // Ainamarth's Fire Breath — damages towers in a cone ahead (movement direction)
       const wp = enemy.flying ? this.flyWaypoints : this.waypoints
-      const nextWp = wp[Math.min(enemy.waypointIndex, wp.length - 1)]
+      // Use the waypoint AHEAD of current position to get movement direction
+      const wpIdx = Math.min(enemy.waypointIndex + 1, wp.length - 1)
+      const nextWp = wp[wpIdx] || wp[wp.length - 1]
       if (!nextWp) return
       const dirX = nextWp.x - ex, dirY = nextWp.y - ey
       const dirLen = Math.sqrt(dirX * dirX + dirY * dirY)
@@ -3232,7 +3243,7 @@ export class GameScene extends Phaser.Scene {
         padding: { x: 16, y: 8 },
       }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
       nextBtn.on('pointerdown', () => {
-        this.scene.start('GameScene', { levelIndex: this.levelIndex + 1, difficulty: this.difficulty })
+        this.scene.start('GameScene', { levelIndex: this.levelIndex + 1, difficulty: this.difficulty, endless: this.endlessMode })
       })
     }
 
