@@ -53,7 +53,6 @@ export class StatsScene extends Phaser.Scene {
     Object.entries(save.levelStars).forEach(([key, s]) => {
       if (/^\d+$/.test(key)) totalStars += s
     })
-    const maxStars = totalLevels * 4 * 3 // 4 difficulties, 3 stars each
     const bonusDone = Object.values(save.bonusMissions || {}).filter(Boolean).length
     const totalBonus = BONUS_MISSIONS.length
     const totalKills = save.totalKills || 0
@@ -70,13 +69,13 @@ export class StatsScene extends Phaser.Scene {
 
     const stats = [
       { label: 'Levels Cleared', value: `${levelsCleared} / ${totalLevels}`, color: '#2ecc71' },
-      { label: 'Total Stars', value: `${totalStars}`, color: '#f1c40f' },
+      { label: 'Total Stars', value: `${totalStars} / ${totalLevels * 3}`, color: '#f1c40f' },
       { label: 'Current Gems', value: `${currentGems}`, color: '#9b59b6' },
       { label: 'Lifetime Gems Earned', value: `${totalGems}`, color: '#9b59b6' },
       { label: 'Total Enemies Killed', value: `${totalKills}`, color: '#e74c3c' },
       { label: 'Bonus Missions', value: `${bonusDone} / ${totalBonus}`, color: '#3498db' },
       { label: 'Upgrades Purchased', value: `${upgradeCount}`, color: '#e67e22' },
-      { label: 'Completion %', value: `${Math.round((levelsCleared / totalLevels) * 100)}%`, color: '#2ecc71' },
+      { label: 'Completion %', value: `${totalLevels > 0 ? Math.round((levelsCleared / totalLevels) * 100) : 0}%`, color: '#2ecc71' },
     ]
 
     stats.forEach((stat, i) => {
