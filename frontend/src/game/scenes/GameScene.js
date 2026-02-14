@@ -1454,6 +1454,7 @@ export class GameScene extends Phaser.Scene {
           menu.destroy()
           this.towerMenu = null
           this._menuTower = null
+          if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1479,6 +1480,7 @@ export class GameScene extends Phaser.Scene {
           menu.destroy()
           this.towerMenu = null
           this._menuTower = null
+          if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1525,19 +1527,23 @@ export class GameScene extends Phaser.Scene {
       menu.destroy()
       this.towerMenu = null
       this._menuTower = null
+      if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
       this.rangeIndicator.setVisible(false)
     })
     menu.add(sellBtn)
 
     this.towerMenu = menu
 
-    this.time.delayedCall(5000, () => {
+    // Auto-close menu after 5 seconds — store timer so it can be cancelled
+    if (this._menuTimer) this._menuTimer.remove()
+    this._menuTimer = this.time.delayedCall(5000, () => {
       if (menu && menu.active) {
         menu.destroy()
         this.towerMenu = null
         this._menuTower = null
         this.rangeIndicator.setVisible(false)
       }
+      this._menuTimer = null
     })
   }
 
@@ -3048,6 +3054,7 @@ export class GameScene extends Phaser.Scene {
       try { this.towerMenu.destroy() } catch (e) {}
       this.towerMenu = null
       this._menuTower = null
+      if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
       this.rangeIndicator.setVisible(false)
     }
     this.tweens.add({
@@ -3090,6 +3097,7 @@ export class GameScene extends Phaser.Scene {
 
     // Clean up active UI elements
     if (this.towerMenu) { try { this.towerMenu.destroy() } catch (e) {} this.towerMenu = null }
+    if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
     this.rangeIndicator.setVisible(false)
     this.cellIndicator.setVisible(false)
     this.cellNoIndicator.setVisible(false)
