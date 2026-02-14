@@ -1764,6 +1764,7 @@ export class GameScene extends Phaser.Scene {
     if (enemy.heals > 0) this.showTutorial('Tut_Healer')
     if (enemy.shieldAura > 0) this.showTutorial('Tut_ShieldBearer')
     if (enemy.speedBuff > 0) this.showTutorial('Tut_Shaman')
+    if (enemy.flying) this.showTutorial('Tut_FlyingEnemy')
 
     this.enemies.push(enemy)
   }

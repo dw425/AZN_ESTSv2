@@ -420,6 +420,7 @@ export const TUTORIALS = {
   Tut_Healer: { title: 'Enemy Healer!', msg: 'Healers restore HP to nearby enemies! Kill them first to stop the healing.' },
   Tut_ShieldBearer: { title: 'Shield Bearer!', msg: 'Shield Bearers reduce damage to nearby enemies. Focus fire on them first!' },
   Tut_Shaman: { title: 'Troll Shaman!', msg: 'Shamans boost the speed of nearby enemies. Take them out quickly!' },
+  Tut_FlyingEnemy: { title: 'Flying Enemy!', msg: 'Flying enemies ignore the path and fly straight to your base! All towers can target them.' },
 }
 
 // grid: 15 columns x 10 rows (960/64=15, 640/64=10)
@@ -465,19 +466,19 @@ export const LEVELS = [
     lives: 18,
     grid: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [2,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,1,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,1,1,1,1,3],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
-      [2,1,1,1,1,1,0,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
-      [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,1,1,1,1,1,1,1,1,1,3],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
     ],
     waves: [
       { enemies: [{ type: 'troll', count: 8, interval: 900 }] },
-      { enemies: [{ type: 'armored_goblin', count: 8, interval: 700 }, { type: 'bat', count: 4, interval: 800 }] },
+      { enemies: [{ type: 'armored_goblin', count: 8, interval: 700 }, { type: 'spider', count: 6, interval: 800 }] },
       { enemies: [{ type: 'troll', count: 6, interval: 800 }, { type: 'ogre', count: 2, interval: 2500 }] },
       { enemies: [{ type: 'orc', count: 8, interval: 700 }, { type: 'gelcube', count: 4, interval: 1200 }] },
       { enemies: [{ type: 'ogre', count: 4, interval: 2000 }, { type: 'armored_goblin', count: 6, interval: 600 }] },
