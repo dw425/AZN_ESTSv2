@@ -486,44 +486,91 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: portal, alpha: { from: 0.8, to: 0.3 }, duration: 1200, yoyo: true, repeat: -1 })
         }
         if (val === 3) {
-          // Base castle — detailed castle graphic
+          // Base castle — grand medieval fortress
           const castle = this.add.graphics().setDepth(2)
-          // Main wall
-          castle.fillStyle(0x8b6914, 0.95)
-          castle.fillRect(x - 20, y - 8, 40, 22)
-          // Battlements (crenellations)
-          castle.fillStyle(0x8b6914, 0.95)
-          for (let b = -18; b <= 14; b += 8) {
-            castle.fillRect(x + b, y - 16, 6, 8)
+
+          // Foundation / stone base
+          castle.fillStyle(0x3d2b1f, 0.95)
+          castle.fillRect(x - 30, y + 14, 60, 8)
+          castle.fillStyle(0x4a3728, 0.9)
+          castle.fillRect(x - 28, y + 16, 56, 4)
+
+          // Main keep (center)
+          castle.fillStyle(0x6b6b6b, 0.95)
+          castle.fillRect(x - 16, y - 18, 32, 32)
+          // Stone block texture
+          castle.lineStyle(1, 0x555555, 0.3)
+          for (let sy = -14; sy <= 10; sy += 6) {
+            castle.lineBetween(x - 15, y + sy, x + 15, y + sy)
           }
+          for (let sx = -10; sx <= 10; sx += 8) {
+            castle.lineBetween(x + sx, y - 18, x + sx, y + 14)
+          }
+          // Keep crenellations
+          castle.fillStyle(0x7a7a7a, 0.95)
+          for (let b = -14; b <= 10; b += 7) {
+            castle.fillRect(x + b, y - 24, 5, 6)
+          }
+
           // Left tower
-          castle.fillStyle(0x7a5a12, 0.95)
-          castle.fillRect(x - 24, y - 22, 12, 36)
-          castle.fillRect(x - 26, y - 28, 6, 6)
-          castle.fillRect(x - 16, y - 28, 6, 6)
+          castle.fillStyle(0x5c5c5c, 0.95)
+          castle.fillRect(x - 28, y - 26, 14, 40)
+          castle.fillStyle(0x6e6e6e, 0.95)
+          castle.fillRect(x - 29, y - 30, 5, 4)
+          castle.fillRect(x - 21, y - 30, 5, 4)
+          // Left conical roof
+          castle.fillStyle(0x8b1a1a, 0.95)
+          castle.fillTriangle(x - 31, y - 30, x - 14, y - 30, x - 22, y - 40)
+
           // Right tower
-          castle.fillRect(x + 12, y - 22, 12, 36)
-          castle.fillRect(x + 10, y - 28, 6, 6)
-          castle.fillRect(x + 20, y - 28, 6, 6)
-          // Gate arch
-          castle.fillStyle(0x2c1810, 0.9)
-          castle.fillRect(x - 6, y - 2, 12, 16)
-          castle.fillStyle(0x1a0e08, 0.9)
-          castle.fillRect(x - 4, y, 8, 14)
-          // Gate portcullis lines
-          castle.lineStyle(1, 0x888888, 0.6)
-          castle.lineBetween(x - 2, y, x - 2, y + 14)
-          castle.lineBetween(x + 2, y, x + 2, y + 14)
-          castle.lineBetween(x - 4, y + 4, x + 4, y + 4)
-          castle.lineBetween(x - 4, y + 8, x + 4, y + 8)
-          // Wall outline
-          castle.lineStyle(1, 0x5a3d0a, 0.8)
-          castle.strokeRect(x - 20, y - 8, 40, 22)
-          // Flag on right tower
+          castle.fillStyle(0x5c5c5c, 0.95)
+          castle.fillRect(x + 14, y - 26, 14, 40)
+          castle.fillStyle(0x6e6e6e, 0.95)
+          castle.fillRect(x + 15, y - 30, 5, 4)
+          castle.fillRect(x + 23, y - 30, 5, 4)
+          // Right conical roof
+          castle.fillStyle(0x8b1a1a, 0.95)
+          castle.fillTriangle(x + 13, y - 30, x + 30, y - 30, x + 21, y - 40)
+
+          // Gate archway
+          castle.fillStyle(0x7a7a7a, 0.95)
+          castle.fillRect(x - 10, y - 4, 20, 6)
+          castle.fillStyle(0x1a1a1a, 0.9)
+          castle.fillCircle(x, y, 8)
+          castle.fillRect(x - 8, y, 16, 14)
+          // Portcullis grid
+          castle.lineStyle(1, 0x888888, 0.5)
+          for (let gx = -5; gx <= 5; gx += 3) {
+            castle.lineBetween(x + gx, y - 2, x + gx, y + 14)
+          }
+          for (let gy = 2; gy <= 12; gy += 4) {
+            castle.lineBetween(x - 7, y + gy, x + 7, y + gy)
+          }
+
+          // Glowing windows
+          castle.fillStyle(0xf1c40f, 0.8)
+          castle.fillRect(x - 24, y - 16, 4, 6)
+          castle.fillRect(x + 20, y - 16, 4, 6)
+          castle.fillRect(x - 6, y - 14, 3, 5)
+          castle.fillRect(x + 3, y - 14, 3, 5)
+          // Window glow
+          castle.fillStyle(0xf1c40f, 0.15)
+          castle.fillCircle(x - 22, y - 13, 5)
+          castle.fillCircle(x + 22, y - 13, 5)
+
+          // Flags on both towers
+          castle.lineStyle(1, 0x333333, 0.9)
+          castle.lineBetween(x - 22, y - 40, x - 22, y - 48)
+          castle.lineBetween(x + 21, y - 40, x + 21, y - 48)
           castle.fillStyle(0xe74c3c, 0.9)
-          castle.fillTriangle(x + 17, y - 30, x + 17, y - 22, x + 26, y - 26)
-          castle.lineStyle(1, 0x333333, 0.8)
-          castle.lineBetween(x + 17, y - 32, x + 17, y - 22)
+          castle.fillTriangle(x - 22, y - 48, x - 22, y - 41, x - 14, y - 44)
+          castle.fillTriangle(x + 21, y - 48, x + 21, y - 41, x + 29, y - 44)
+
+          // Outlines
+          castle.lineStyle(1, 0x444444, 0.6)
+          castle.strokeRect(x - 28, y - 26, 14, 40)
+          castle.strokeRect(x + 14, y - 26, 14, 40)
+          castle.strokeRect(x - 16, y - 18, 32, 32)
         }
       }
     }
@@ -1123,6 +1170,23 @@ export class GameScene extends Phaser.Scene {
   handleClick(pointer) {
     if (this.gameOver || this.paused) return
     if (pointer.y < 36 || pointer.y > this.cameras.main.height - 80) return
+
+    // When tower menu is open, only allow closing it by clicking away — don't place towers
+    if (this.towerMenu) {
+      const menuTower = this._menuTower
+      if (menuTower) {
+        const col = Math.floor(pointer.x / TILE)
+        const row = Math.floor(pointer.y / TILE)
+        if (col !== menuTower.gridCol || row !== menuTower.gridRow) {
+          this.towerMenu.destroy()
+          this.towerMenu = null
+          this._menuTower = null
+          if (this._menuTimer) { this._menuTimer.remove(); this._menuTimer = null }
+          this.rangeIndicator.setVisible(false)
+        }
+      }
+      return
+    }
 
     // Deploy weapon if active — but don't deploy on the same frame weapon was selected
     if (this.activeWeapon) {
