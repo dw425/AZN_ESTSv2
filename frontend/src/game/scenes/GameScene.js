@@ -1360,6 +1360,7 @@ export class GameScene extends Phaser.Scene {
 
   showTowerMenu(tower) {
     if (this.towerMenu) this.towerMenu.destroy()
+    this._menuTower = tower
     this.playSfx('sfx_tower_menu')
 
     const def = TOWER_TYPES[tower.type]
@@ -1452,6 +1453,7 @@ export class GameScene extends Phaser.Scene {
           this.showTutorial('Tut_UpgradeTower')
           menu.destroy()
           this.towerMenu = null
+          this._menuTower = null
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1476,6 +1478,7 @@ export class GameScene extends Phaser.Scene {
           this.showTutorial('Tut_Repair')
           menu.destroy()
           this.towerMenu = null
+          this._menuTower = null
           this.rangeIndicator.setVisible(false)
         }
       })
@@ -1521,6 +1524,7 @@ export class GameScene extends Phaser.Scene {
       this.playSfx('sfx_tower_sell')
       menu.destroy()
       this.towerMenu = null
+      this._menuTower = null
       this.rangeIndicator.setVisible(false)
     })
     menu.add(sellBtn)
@@ -1531,6 +1535,7 @@ export class GameScene extends Phaser.Scene {
       if (menu && menu.active) {
         menu.destroy()
         this.towerMenu = null
+        this._menuTower = null
         this.rangeIndicator.setVisible(false)
       }
     })
@@ -1772,9 +1777,29 @@ export class GameScene extends Phaser.Scene {
         }
         if (enemy.slowTimer <= 0) {
           enemy.speed = enemy.baseSpeed
-          if (enemy._baseTint) enemy.sprite.setTint(enemy._baseTint)
-          else enemy.sprite.clearTint()
+          enemy._iceTinted = false
+          // If gas timer still active, keep gas green tint
+          if (enemy._gasTimer > 0) {
+            enemy.sprite.setTint(0x2ecc71)
+          } else if (enemy._baseTint) {
+            enemy.sprite.setTint(enemy._baseTint)
+          } else {
+            enemy.sprite.clearTint()
+          }
           if (enemy.boss) enemy.sprite.setTint(0xff6666)
+        }
+        // Tick gas timer independently
+        if (enemy._gasTimer > 0) {
+          enemy._gasTimer -= speedDelta
+          if (enemy._gasTimer <= 0) {
+            enemy._gasTimer = 0
+            // Restore proper tint when gas expires (if no ice active)
+            if (!enemy._iceTinted) {
+              if (enemy._baseTint) enemy.sprite.setTint(enemy._baseTint)
+              else if (enemy.slowTimer <= 0) enemy.sprite.clearTint()
+              if (enemy.boss) enemy.sprite.setTint(0xff6666)
+            }
+          }
         }
       } else {
         // Reset speed to base each frame so shaman buff only applies while in range
@@ -2241,9 +2266,13 @@ export class GameScene extends Phaser.Scene {
           if (Math.sqrt(dx * dx + dy * dy) <= dep.radius) {
             this.damageEnemy(enemy, (dep.dps * speedDelta) / 1000)
             // Gas slows enemies by 40%
+            enemy._gasTimer = Math.max(enemy._gasTimer || 0, 500)
             enemy.slowTimer = Math.max(enemy.slowTimer || 0, 500)
             enemy.speed = Math.min(enemy.speed, enemy.baseSpeed * 0.6)
-            if (enemy.sprite && enemy.sprite.active) enemy.sprite.setTint(0x2ecc71)
+            // Only show gas green tint if no ice blue tint is active
+            if (enemy.sprite && enemy.sprite.active && !(enemy._iceTinted)) {
+              enemy.sprite.setTint(0x2ecc71)
+            }
             // Track unique enemies hit for gas_multi_5 bonus mission
             if (dep.hitEnemies) dep.hitEnemies.add(enemy)
           }
@@ -2529,6 +2558,7 @@ export class GameScene extends Phaser.Scene {
         if (proj.slow > 0 && enemy.sprite && enemy.sprite.active) {
           enemy.speed = Math.min(enemy.speed, enemy.baseSpeed * proj.slow)
           enemy.slowTimer = Math.max(enemy.slowTimer, proj.slowDuration)
+          enemy._iceTinted = true
           enemy.sprite.setTint(0x00bcd4)
         }
       })
@@ -2764,6 +2794,18 @@ export class GameScene extends Phaser.Scene {
       const hpBg = this.add.graphics().setDepth(7)
       const hpBar = this.add.graphics().setDepth(8)
 
+      // Find the nearest waypoint ahead of spawn position to prevent backtracking
+      const wp = enemy.flying ? this.flyWaypoints : this.waypoints
+      let bestWpIdx = enemy.waypointIndex
+      for (let wi = Math.max(0, enemy.waypointIndex - 1); wi < Math.min(wp.length, enemy.waypointIndex + 2); wi++) {
+        const wdx = wp[wi].x - sprite.x
+        const wdy = wp[wi].y - sprite.y
+        const wdist = Math.sqrt(wdx * wdx + wdy * wdy)
+        if (wdist < 10) { bestWpIdx = wi + 1; break }
+      }
+      // Ensure babies always move forward, never backward
+      bestWpIdx = Math.max(bestWpIdx, enemy.waypointIndex)
+
       const baby = {
         sprite, hpBg, hpBar,
         type: 'slime_baby',
@@ -2771,7 +2813,7 @@ export class GameScene extends Phaser.Scene {
         baseSpeed: scaledSpeed, speed: scaledSpeed,
         reward: babyDef.reward,
         damage: babyDef.damage,
-        waypointIndex: enemy.waypointIndex, // continue from parent's position
+        waypointIndex: Math.min(bestWpIdx, wp.length - 1),
         slowTimer: 0,
         barWidth: 20,
         splits: 0, regens: 0, towerDamage: 0,
@@ -3001,10 +3043,11 @@ export class GameScene extends Phaser.Scene {
     tower.hp = 0
     try { if (tower.hpBg) tower.hpBg.setVisible(false) } catch (e) {}
     try { if (tower.hpBar) tower.hpBar.setVisible(false) } catch (e) {}
-    // Close tower menu if it's open for this tower
-    if (this.towerMenu) {
+    // Close tower menu only if the destroyed tower's menu is open
+    if (this.towerMenu && this._menuTower === tower) {
       try { this.towerMenu.destroy() } catch (e) {}
       this.towerMenu = null
+      this._menuTower = null
       this.rangeIndicator.setVisible(false)
     }
     this.tweens.add({

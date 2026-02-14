@@ -62,6 +62,12 @@ export class SettingsScene extends Phaser.Scene {
     // SFX Volume slider
     this.createSlider(cx, y, 'SFX Volume', settings.sfxVolume, (val) => {
       settings.sfxVolume = val
+      // Play a test SFX so the user hears the volume change immediately
+      try {
+        if (this.cache.audio.exists('sfx_chime1')) {
+          this.sound.play('sfx_chime1', { volume: 0.4 * val })
+        }
+      } catch (e) { /* audio not available */ }
     })
     y += 70
 
