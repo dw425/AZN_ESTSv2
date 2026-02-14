@@ -748,8 +748,8 @@ export class GameScene extends Phaser.Scene {
 
     const buttons = [
       { text: 'Resume', color: '#2ecc71', action: () => { container.destroy(); this.pauseMenu = null; this.paused = false; this.time.paused = false; this.tweens.resumeAll() } },
-      { text: 'Restart', color: '#f1c40f', action: () => { this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, endless: this.endlessMode }) } },
-      { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.stopMusic(); this.scene.start('LevelSelectScene') } },
+      { text: 'Restart', color: '#f1c40f', action: () => { this.time.paused = false; this.stopMusic(); this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, endless: this.endlessMode }) } },
+      { text: 'Quit to Menu', color: '#e74c3c', action: () => { this.time.paused = false; this.stopMusic(); this.scene.start('LevelSelectScene') } },
     ]
 
     buttons.forEach((btn, i) => {
