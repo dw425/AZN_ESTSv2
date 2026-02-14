@@ -133,17 +133,29 @@ export class ShopScene extends Phaser.Scene {
       }
     })
 
-    // Back button
-    const backBtn = this.add.text(60, h - 35, '< Back', {
-      fontSize: '20px',
-      color: '#aaa',
-      fontStyle: 'bold',
-      stroke: '#000',
-      strokeThickness: 2,
-    }).setInteractive({ useHandCursor: true })
-    backBtn.on('pointerdown', () => this.scene.start('LevelSelectScene'))
-    backBtn.on('pointerover', () => backBtn.setColor('#9b59b6'))
-    backBtn.on('pointerout', () => backBtn.setColor('#aaa'))
+    // Back button — use asset if available
+    if (this.textures.exists('back_button')) {
+      const backImg = this.add.image(45, h - 28, 'back_button')
+        .setDisplaySize(70, 30).setInteractive({ useHandCursor: true }).setDepth(10)
+      backImg.on('pointerdown', () => {
+        try { this.scene.start('LevelSelectScene') } catch (e) { this.scene.start('MenuScene') }
+      })
+      backImg.on('pointerover', () => backImg.setTint(0xddaa66))
+      backImg.on('pointerout', () => backImg.clearTint())
+    } else {
+      const backBtn = this.add.text(60, h - 35, '< Back', {
+        fontSize: '20px',
+        color: '#aaa',
+        fontStyle: 'bold',
+        stroke: '#000',
+        strokeThickness: 2,
+      }).setInteractive({ useHandCursor: true })
+      backBtn.on('pointerdown', () => {
+        try { this.scene.start('LevelSelectScene') } catch (e) { this.scene.start('MenuScene') }
+      })
+      backBtn.on('pointerover', () => backBtn.setColor('#9b59b6'))
+      backBtn.on('pointerout', () => backBtn.setColor('#aaa'))
+    }
   }
 
   updateGemDisplay() {

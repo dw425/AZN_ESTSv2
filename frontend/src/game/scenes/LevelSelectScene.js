@@ -108,19 +108,19 @@ export class LevelSelectScene extends Phaser.Scene {
     // Difficulty popup container (hidden)
     this.diffPopup = null
 
-    // Endless mode button
+    // Endless mode button — shows difficulty popup with endless flag
+    this.endlessMode = false
     const endlessBtn = this.add.text(cx, h - 28, '\u221E Endless', {
       fontSize: '14px', color: '#ff4500', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10)
     endlessBtn.on('pointerdown', () => {
-      // Start endless mode on a random unlocked level
-      const maxLevel = Math.min(progress, LEVELS.length)
-      const levelIdx = Math.floor(Math.random() * maxLevel)
-      this.scene.start('GameScene', { levelIndex: levelIdx, difficulty: 'normal', endless: true })
+      this.endlessMode = !this.endlessMode
+      endlessBtn.setColor(this.endlessMode ? '#fff' : '#ff4500')
+      endlessBtn.setText(this.endlessMode ? '\u221E ENDLESS ON' : '\u221E Endless')
     })
-    endlessBtn.on('pointerover', () => endlessBtn.setColor('#ff7744'))
-    endlessBtn.on('pointerout', () => endlessBtn.setColor('#ff4500'))
+    endlessBtn.on('pointerover', () => endlessBtn.setAlpha(0.7))
+    endlessBtn.on('pointerout', () => endlessBtn.setAlpha(1))
 
     // Shop button
     const shopBtn = this.add.text(w - 70, h - 28, 'Shop', {
@@ -202,7 +202,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
       // Level name
       this.pageContainer.add(this.add.text(x, y + cardH * 0.28, level.name, {
-        fontSize: '9px', color: unlocked ? '#ddd' : '#555', fontStyle: 'bold',
+        fontSize: '11px', color: unlocked ? '#ddd' : '#555', fontStyle: 'bold',
         stroke: '#000', strokeThickness: 1,
       }).setOrigin(0.5))
 
@@ -285,7 +285,7 @@ export class LevelSelectScene extends Phaser.Scene {
       }).setInteractive({ useHandCursor: true })
 
       btn.on('pointerdown', () => {
-        this.scene.start('GameScene', { levelIndex, difficulty: diff.key })
+        this.scene.start('GameScene', { levelIndex, difficulty: diff.key, endless: this.endlessMode || false })
       })
       btn.on('pointerover', () => btn.setAlpha(0.7))
       btn.on('pointerout', () => btn.setAlpha(1))

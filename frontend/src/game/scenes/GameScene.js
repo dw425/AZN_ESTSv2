@@ -231,26 +231,26 @@ export class GameScene extends Phaser.Scene {
       })
     }
 
-    // Start wave button
+    // Start wave button — positioned above build panel
     this.startWaveBtn = this.add.text(
-      this.cameras.main.centerX, this.cameras.main.height - 95,
+      this.cameras.main.centerX, this.cameras.main.height - 105,
       '>> START WAVE 1 <<',
-      { fontSize: '20px', color: '#f1c40f', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }
+      { fontSize: '18px', color: '#f1c40f', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }
     ).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(20)
 
     this.startWaveBtn.on('pointerdown', () => this.startNextWave())
     this.startWaveBtn.on('pointerover', () => this.startWaveBtn.setColor('#fff'))
     this.startWaveBtn.on('pointerout', () => this.startWaveBtn.setColor('#f1c40f'))
 
-    // Wave countdown text (hidden)
+    // Wave countdown text (hidden) — below start wave button
     this.countdownText = this.add.text(
-      this.cameras.main.centerX, this.cameras.main.height - 95,
-      '', { fontSize: '16px', color: '#aaa', stroke: '#000', strokeThickness: 2 }
+      this.cameras.main.centerX, this.cameras.main.height - 85,
+      '', { fontSize: '13px', color: '#aaa', stroke: '#000', strokeThickness: 2 }
     ).setOrigin(0.5).setDepth(20).setVisible(false)
 
-    // Wave preview text showing upcoming enemies
+    // Wave preview text showing upcoming enemies — above start wave button
     this.wavePreview = this.add.text(
-      this.cameras.main.centerX, this.cameras.main.height - 115,
+      this.cameras.main.centerX, this.cameras.main.height - 125,
       '', { fontSize: '10px', color: '#888', stroke: '#000', strokeThickness: 1 }
     ).setOrigin(0.5).setDepth(20)
     this.updateWavePreview()
@@ -431,7 +431,7 @@ export class GameScene extends Phaser.Scene {
           const py = r * TILE + TILE / 2
           if (hasPlatform) {
             this.add.image(px, py, 'tower_platform')
-              .setDisplaySize(TILE - 2, TILE - 2).setDepth(1).setAlpha(0.65)
+              .setDisplaySize(TILE - 2, TILE - 2).setDepth(1).setAlpha(0.15)
           }
         }
       }
@@ -459,14 +459,19 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: portal, alpha: { from: 0.8, to: 0.3 }, duration: 1200, yoyo: true, repeat: -1 })
         }
         if (val === 3) {
-          // Base castle — use health icon as castle marker
-          if (this.textures.exists('hud_health')) {
-            this.add.image(x, y, 'hud_health').setDisplaySize(30, 30).setDepth(2).setAlpha(0.85)
+          // Base castle — use castle icon if available, otherwise health icon
+          const castleKey = this.textures.exists('castle') ? 'castle' : 'hud_health'
+          if (this.textures.exists(castleKey)) {
+            this.add.image(x, y, castleKey).setDisplaySize(36, 36).setDepth(2).setAlpha(0.9)
+          } else {
+            // Fallback: draw a simple castle shape
+            const castle = this.add.graphics().setDepth(2)
+            castle.fillStyle(0x8b4513, 0.8)
+            castle.fillRect(x - 14, y - 10, 28, 20)
+            castle.fillRect(x - 16, y - 16, 8, 6)
+            castle.fillRect(x + 8, y - 16, 8, 6)
+            castle.fillRect(x - 4, y - 14, 8, 4)
           }
-          this.add.text(x, y + 20, '\u2691 BASE', {
-            fontSize: '9px', color: '#e74c3c',
-            stroke: '#000', strokeThickness: 2, fontStyle: 'bold',
-          }).setOrigin(0.5).setDepth(3).setAlpha(0.7)
         }
       }
     }
@@ -506,10 +511,10 @@ export class GameScene extends Phaser.Scene {
         dep.sprite.lineStyle(2, 0xd4ac0d)
         dep.sprite.strokeCircle(dx, dy, 12)
       }
-      this.add.text(dx, dy + 18, 'GOLD', {
-        fontSize: '8px', color: '#f1c40f', fontStyle: 'bold',
-        stroke: '#000', strokeThickness: 1,
-      }).setOrigin(0.5).setDepth(4)
+      // Gold icon shimmer to indicate interactivity
+      if (dep.sprite && dep.sprite.setAlpha) {
+        this.tweens.add({ targets: dep.sprite, alpha: { from: 0.9, to: 0.6 }, duration: 1500, yoyo: true, repeat: -1 })
+      }
     })
 
     // Render treasure chests as destructible targets with HP
@@ -1327,7 +1332,7 @@ export class GameScene extends Phaser.Scene {
     this.rangeIndicator.setDisplaySize(tower.range * 2, tower.range * 2)
     this.rangeIndicator.setVisible(true)
 
-    const menuH = 60 + (upgrade ? 25 : 0) + (needsRepair ? 20 : 0)
+    const menuH = 75 + (upgrade ? 22 : 0) + (needsRepair ? 22 : 0)
     const menu = this.add.container(tower.x, tower.y - 55).setDepth(30)
 
     const bg = this.add.graphics()
@@ -1440,9 +1445,9 @@ export class GameScene extends Phaser.Scene {
 
     const sellValue = Math.floor(tower.totalInvestment * 0.5)
     if (this.textures.exists('hud_sell')) {
-      menu.add(this.add.image(25, yOffset - 11, 'hud_sell').setDisplaySize(14, 14))
+      menu.add(this.add.image(-55, yOffset + 7, 'hud_sell').setDisplaySize(14, 14))
     }
-    const sellBtn = this.add.text(40, yOffset - 18, `Sell $${sellValue}`, {
+    const sellBtn = this.add.text(-40, yOffset, `Sell $${sellValue}`, {
       fontSize: '11px', color: '#e74c3c', fontStyle: 'bold',
     }).setInteractive({ useHandCursor: true })
     sellBtn.on('pointerdown', () => {
@@ -1518,12 +1523,12 @@ export class GameScene extends Phaser.Scene {
         ? `\u221E WAVE ${this.currentWave + 1}`
         : `WAVE ${this.currentWave + 1}/${this.levelData.waves.length}`
       const waveText = this.add.text(
-        this.cameras.main.centerX, this.cameras.main.centerY - 50,
-        waveLabel, { fontSize: '20px', color: '#fff', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }
+        this.cameras.main.centerX, 55,
+        waveLabel, { fontSize: '16px', color: '#fff', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }
       ).setOrigin(0.5).setDepth(30).setAlpha(0)
       this.tweens.add({
         targets: waveText, alpha: 1, duration: 200,
-        yoyo: true, hold: 800,
+        yoyo: true, hold: 400,
         onComplete: () => waveText.destroy(),
       })
     }

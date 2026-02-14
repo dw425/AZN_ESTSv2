@@ -27,6 +27,11 @@ export default function GameWrapper({ user, onLogout, apiBase }) {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
+      render: {
+        antialias: true,
+        pixelArt: false,
+        roundPixels: false,
+      },
       scene: [BootScene, MenuScene, LevelSelectScene, ShopScene, StatsScene, SettingsScene, GameScene],
       input: {
         activePointers: 3,
