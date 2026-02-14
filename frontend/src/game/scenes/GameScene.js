@@ -486,19 +486,44 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: portal, alpha: { from: 0.8, to: 0.3 }, duration: 1200, yoyo: true, repeat: -1 })
         }
         if (val === 3) {
-          // Base castle — use castle icon if available, otherwise health icon
-          const castleKey = this.textures.exists('castle') ? 'castle' : 'hud_health'
-          if (this.textures.exists(castleKey)) {
-            this.add.image(x, y, castleKey).setDisplaySize(36, 36).setDepth(2).setAlpha(0.9)
-          } else {
-            // Fallback: draw a simple castle shape
-            const castle = this.add.graphics().setDepth(2)
-            castle.fillStyle(0x8b4513, 0.8)
-            castle.fillRect(x - 14, y - 10, 28, 20)
-            castle.fillRect(x - 16, y - 16, 8, 6)
-            castle.fillRect(x + 8, y - 16, 8, 6)
-            castle.fillRect(x - 4, y - 14, 8, 4)
+          // Base castle — detailed castle graphic
+          const castle = this.add.graphics().setDepth(2)
+          // Main wall
+          castle.fillStyle(0x8b6914, 0.95)
+          castle.fillRect(x - 20, y - 8, 40, 22)
+          // Battlements (crenellations)
+          castle.fillStyle(0x8b6914, 0.95)
+          for (let b = -18; b <= 14; b += 8) {
+            castle.fillRect(x + b, y - 16, 6, 8)
           }
+          // Left tower
+          castle.fillStyle(0x7a5a12, 0.95)
+          castle.fillRect(x - 24, y - 22, 12, 36)
+          castle.fillRect(x - 26, y - 28, 6, 6)
+          castle.fillRect(x - 16, y - 28, 6, 6)
+          // Right tower
+          castle.fillRect(x + 12, y - 22, 12, 36)
+          castle.fillRect(x + 10, y - 28, 6, 6)
+          castle.fillRect(x + 20, y - 28, 6, 6)
+          // Gate arch
+          castle.fillStyle(0x2c1810, 0.9)
+          castle.fillRect(x - 6, y - 2, 12, 16)
+          castle.fillStyle(0x1a0e08, 0.9)
+          castle.fillRect(x - 4, y, 8, 14)
+          // Gate portcullis lines
+          castle.lineStyle(1, 0x888888, 0.6)
+          castle.lineBetween(x - 2, y, x - 2, y + 14)
+          castle.lineBetween(x + 2, y, x + 2, y + 14)
+          castle.lineBetween(x - 4, y + 4, x + 4, y + 4)
+          castle.lineBetween(x - 4, y + 8, x + 4, y + 8)
+          // Wall outline
+          castle.lineStyle(1, 0x5a3d0a, 0.8)
+          castle.strokeRect(x - 20, y - 8, 40, 22)
+          // Flag on right tower
+          castle.fillStyle(0xe74c3c, 0.9)
+          castle.fillTriangle(x + 17, y - 30, x + 17, y - 22, x + 26, y - 26)
+          castle.lineStyle(1, 0x333333, 0.8)
+          castle.lineBetween(x + 17, y - 32, x + 17, y - 22)
         }
       }
     }
@@ -3227,18 +3252,22 @@ export class GameScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(51)
 
+    // Remove scene-level input listeners so buttons work reliably
+    this.input.removeAllListeners('pointerdown')
+    this.input.removeAllListeners('pointermove')
+
     // Buttons
     const menuBtn = this.add.text(cx - 80, cy + 80, 'Menu', {
       fontSize: '20px', color: '#fff', backgroundColor: '#16213e',
       padding: { x: 16, y: 8 },
-    }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
+    }).setOrigin(0.5).setDepth(55).setInteractive({ useHandCursor: true })
     menuBtn.on('pointerdown', () => this.scene.start('LevelSelectScene'))
 
     if (won && this.levelIndex + 1 < LEVELS.length) {
       const nextBtn = this.add.text(cx + 80, cy + 80, 'Next', {
         fontSize: '20px', color: '#fff', backgroundColor: '#e94560',
         padding: { x: 16, y: 8 },
-      }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
+      }).setOrigin(0.5).setDepth(55).setInteractive({ useHandCursor: true })
       nextBtn.on('pointerdown', () => {
         this.scene.start('GameScene', { levelIndex: this.levelIndex + 1, difficulty: this.difficulty, endless: this.endlessMode })
       })
@@ -3246,7 +3275,7 @@ export class GameScene extends Phaser.Scene {
 
     const retryBtn = this.add.text(cx, cy + 120, 'Retry', {
       fontSize: '16px', color: '#888',
-    }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true })
+    }).setOrigin(0.5).setDepth(55).setInteractive({ useHandCursor: true })
     retryBtn.on('pointerdown', () => {
       this.scene.start('GameScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, endless: this.endlessMode })
     })
