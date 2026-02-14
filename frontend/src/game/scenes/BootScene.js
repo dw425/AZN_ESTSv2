@@ -261,29 +261,7 @@ export class BootScene extends Phaser.Scene {
       }
     })
 
-    // Creep walk animations using individual loaded images
-    const animDefs = [
-      { key: 'troll_walk', prefix: 'creep_troll', frames: ['creep_troll', 'creep_troll_1', 'creep_troll_2'], rate: 6 },
-      { key: 'goblin_walk', prefix: 'creep_goblin', frames: ['creep_goblin', 'creep_goblin_1', 'creep_goblin_2'], rate: 8 },
-      { key: 'ogre_walk', prefix: 'creep_ogre', frames: ['creep_ogre', 'creep_ogre_1', 'creep_ogre_2'], rate: 5 },
-      { key: 'orc_walk', prefix: 'creep_orc', frames: ['creep_orc', 'creep_orc_1', 'creep_orc_2', 'creep_orc_3'], rate: 7 },
-      { key: 'slime_walk', prefix: 'creep_slime', frames: ['creep_slime', 'creep_slime_1'], rate: 4 },
-      { key: 'gelcube_walk', prefix: 'creep_gelcube', frames: ['creep_gelcube', 'creep_gelcube_1'], rate: 3 },
-      { key: 'beholder_walk', prefix: 'creep_beholder', frames: ['creep_beholder', 'creep_beholder_1'], rate: 4 },
-      { key: 'dragon_walk', prefix: 'creep_dragon', frames: ['creep_dragon', 'creep_dragon_1', 'creep_dragon_2'], rate: 5 },
-    ]
-
-    animDefs.forEach(def => {
-      const validFrames = def.frames.filter(f => this.textures.exists(f))
-      if (validFrames.length > 1) {
-        this.anims.create({
-          key: def.key,
-          frames: validFrames.map(f => ({ key: f })),
-          frameRate: def.rate,
-          repeat: -1,
-        })
-      }
-    })
+    // Creep walk animations removed — enemies now glide as static images for cleaner visuals
   }
 
   generateFallbacks() {

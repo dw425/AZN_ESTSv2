@@ -261,6 +261,20 @@ export class GameScene extends Phaser.Scene {
       '', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }
     ).setOrigin(0.5).setDepth(40).setVisible(false)
 
+    // Show level name at start (fades out after 2 seconds)
+    const levelNameText = this.add.text(
+      this.cameras.main.centerX, 60,
+      this.levelData.name, {
+        fontSize: '24px', color: '#fff', fontStyle: 'bold',
+        stroke: '#000', strokeThickness: 4,
+      }
+    ).setOrigin(0.5).setDepth(30).setAlpha(0)
+    this.tweens.add({
+      targets: levelNameText, alpha: 1, duration: 300,
+      yoyo: true, hold: 1500,
+      onComplete: () => levelNameText.destroy(),
+    })
+
     // Show bonus mission objective at level start (fades out after 4 seconds)
     const missionIdx = this.levelData.bonusMission
     if (missionIdx !== undefined && BONUS_MISSIONS[missionIdx]) {
@@ -407,15 +421,19 @@ export class GameScene extends Phaser.Scene {
       }
       underImg.setMask(maskShape.createGeometryMask())
     } else {
-      // Fallback: use pathBrush overlay when no underground texture exists
+      // Fallback: use pathBrush overlay or solid path indicator
       const hasPathBrush = this.textures.exists('path_brush')
-      if (hasPathBrush) {
-        for (let r = 0; r < grid.length; r++) {
-          for (let c = 0; c < grid[r].length; c++) {
-            const v = grid[r][c]
-            if (v >= 1 && v <= 3) {
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const v = grid[r][c]
+          if (v >= 1 && v <= 3) {
+            if (hasPathBrush) {
               this.add.image(c * TILE + TILE / 2, r * TILE + TILE / 2, 'path_brush')
-                .setDisplaySize(TILE, TILE).setDepth(1).setAlpha(0.5)
+                .setDisplaySize(TILE, TILE).setDepth(1).setAlpha(0.6)
+            } else {
+              const pathGfx = this.add.graphics().setDepth(1)
+              pathGfx.fillStyle(0x443322, 0.4)
+              pathGfx.fillRect(c * TILE, r * TILE, TILE, TILE)
             }
           }
         }
@@ -587,6 +605,21 @@ export class GameScene extends Phaser.Scene {
     this.killText = this.add.text(520, 8, '', {
       fontSize: '14px', color: '#aaa',
     }).setDepth(16)
+
+    // Combo indicator (hidden until combo >= 3)
+    this.comboText = this.add.text(w / 2, 10, '', {
+      fontSize: '14px', color: '#f1c40f', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5, 0).setDepth(16).setAlpha(0)
+
+    // Persistent bonus mission indicator
+    const mIdx = this.levelData.bonusMission
+    if (mIdx !== undefined && BONUS_MISSIONS[mIdx]) {
+      this.bonusMissionText = this.add.text(5, this.cameras.main.height - 115, `\u2606 ${BONUS_MISSIONS[mIdx].desc}`, {
+        fontSize: '9px', color: '#f1c40f', fontStyle: 'italic',
+        stroke: '#000', strokeThickness: 1,
+      }).setDepth(16).setAlpha(0.5)
+    }
 
     // Speed controls — 1x / 2x / 3x cycle + pause
     const speedX = w - 150
@@ -795,8 +828,10 @@ export class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .setDepth(16)
 
-      const label = this.add.text(x, y + 28, `${tower.name}\n$${tower.cost}`, {
-        fontSize: '9px', color: '#ccc', align: 'center',
+      const dps = Math.round(tower.damage / (tower.fireRate / 1000))
+      const dmgIcon = tower.damageType === 'physical' ? '\u2694' : '\u2728'
+      const label = this.add.text(x, y + 28, `${tower.name}\n$${tower.cost} ${dmgIcon}${dps}/s`, {
+        fontSize: '8px', color: '#ccc', align: 'center',
       }).setOrigin(0.5, 0).setDepth(16)
 
       const highlight = this.add.graphics().setDepth(15)
@@ -1204,7 +1239,9 @@ export class GameScene extends Phaser.Scene {
     // Scale proportionally to fit within tile (maintain aspect ratio to avoid distortion)
     const maxTowerSize = 58
     const tScale = maxTowerSize / Math.max(sprite.width, sprite.height)
-    sprite.setScale(tScale)
+    // Placement bounce animation
+    sprite.setScale(0)
+    this.tweens.add({ targets: sprite, scaleX: tScale, scaleY: tScale, duration: 300, ease: 'Back.easeOut' })
     // Rescale on animation frame change — fire animation frames are 256x256 while base sprites
     // are 60-110px; without this, the sprite pops to 3-4x size during fire animations
     sprite.on('animationupdate', () => {
@@ -1599,31 +1636,11 @@ export class GameScene extends Phaser.Scene {
     const start = this.waypoints[0]
     const targetSize = def.boss ? 60 : def.size ? Math.round(44 * def.size) : 44
 
-    // Use animated sprite if walk animation exists for this enemy type
-    const baseType = type.replace('boss_', '')
-    const animKey = `${baseType}_walk`
-    const hasAnim = this.anims.exists(animKey)
-
-    const sprite = hasAnim
-      ? this.add.sprite(start.x, start.y, def.texture).setDepth(6)
-      : this.add.image(start.x, start.y, def.texture).setDepth(6)
-    // Scale proportionally to maintain aspect ratio
+    // Static image — enemies glide smoothly along the path
+    const sprite = this.add.image(start.x, start.y, def.texture).setDepth(6)
     const eScale = targetSize / Math.max(sprite.width, sprite.height)
     sprite.setScale(eScale)
-    // Rescale on animation frame change to prevent size popping from inconsistent frame dimensions
-    if (hasAnim) {
-      sprite.on('animationupdate', () => {
-        const fw = sprite.frame.realWidth || sprite.frame.width
-        const fh = sprite.frame.realHeight || sprite.frame.height
-        sprite.setScale(targetSize / Math.max(fw, fh))
-      })
-    }
     this.enemyGroup.add(sprite)
-
-    // Play walk animation if available
-    if (hasAnim && sprite.play) {
-      try { sprite.play(animKey) } catch (e) {}
-    }
 
     // Spawn fade-in
     sprite.setAlpha(0)
@@ -1741,6 +1758,15 @@ export class GameScene extends Phaser.Scene {
       // Handle slow effect
       if (enemy.slowTimer > 0) {
         enemy.slowTimer -= speedDelta
+        // Ice slow particle effect
+        enemy._slowParticleTimer = (enemy._slowParticleTimer || 0) - speedDelta
+        if (enemy._slowParticleTimer <= 0) {
+          const ice = this.add.graphics().setDepth(7).setPosition(enemy.sprite.x, enemy.sprite.y)
+          ice.fillStyle(0x00bcd4, 0.6)
+          ice.fillCircle(0, 0, 2)
+          this.tweens.add({ targets: ice, y: enemy.sprite.y + 10, alpha: 0, duration: 300, onComplete: () => ice.destroy() })
+          enemy._slowParticleTimer = 500
+        }
         if (enemy.slowTimer <= 0) {
           enemy.speed = enemy.baseSpeed
           if (enemy._baseTint) enemy.sprite.setTint(enemy._baseTint)
@@ -1810,6 +1836,7 @@ export class GameScene extends Phaser.Scene {
           this.removeEnemy(enemy)
           this.updateHUD()
           this.playSfx('sfx_base_hit')
+          this.cameras.main.flash(200, 200, 50, 50)
           this.showTutorial('Tut_BaseDamaged')
           if (this.lives <= 0) {
             this.handleGameOver(false)
@@ -1858,6 +1885,16 @@ export class GameScene extends Phaser.Scene {
       const color = hpRatio > 0.5 ? 0x2ecc71 : hpRatio > 0.25 ? 0xf39c12 : 0xe74c3c
       enemy.hpBar.fillStyle(color)
       enemy.hpBar.fillRect(-halfBar, -20, enemy.barWidth * hpRatio, 4)
+
+      // Resistance indicators — small dots next to HP bar
+      if (enemy.physResist > 0) {
+        enemy.hpBg.fillStyle(0x8899aa, 0.8)
+        enemy.hpBg.fillCircle(halfBar + 4, -18, 2)
+      }
+      if (enemy.magResist > 0) {
+        enemy.hpBg.fillStyle(0x9b59b6, 0.8)
+        enemy.hpBg.fillCircle(halfBar + (enemy.physResist > 0 ? 9 : 4), -18, 2)
+      }
 
       // Update boss name plate
       if (enemy.namePlate) {
@@ -2030,6 +2067,14 @@ export class GameScene extends Phaser.Scene {
             tower.lastTarget = bestTarget
           }
           const stackMult = 1 + tower.stackCount * 0.25
+          // Scout hit streak indicator
+          if (tower.stackCount >= 2) {
+            if (tower._streakText) tower._streakText.destroy()
+            tower._streakText = this.add.text(tower.x, tower.y - 35, `x${tower.stackCount + 1}`, {
+              fontSize: '10px', color: '#ff6600', fontStyle: 'bold', stroke: '#000', strokeThickness: 2,
+            }).setOrigin(0.5).setDepth(15)
+            this.tweens.add({ targets: tower._streakText, alpha: 0.3, delay: 800, duration: 200 })
+          }
           this.fireProjectile(tower, bestTarget, Math.round(tower.damage * stackMult))
         } else if (tower.type === 'storm') {
           this.fireChainLightning(tower, bestTarget)
@@ -2232,6 +2277,21 @@ export class GameScene extends Phaser.Scene {
       if (this.goldWaveBonus > 0) {
         this.gold += this.goldWaveBonus
       }
+
+      // Wave cleared celebration
+      const wcText = this.add.text(
+        this.cameras.main.centerX, this.cameras.main.centerY - 40,
+        'WAVE CLEARED!', {
+          fontSize: '20px', color: '#2ecc71', fontStyle: 'bold',
+          stroke: '#000', strokeThickness: 3,
+        }
+      ).setOrigin(0.5).setDepth(30).setAlpha(0)
+      this.tweens.add({
+        targets: wcText, alpha: 1, scaleX: { from: 0.5, to: 1 }, scaleY: { from: 0.5, to: 1 },
+        duration: 300, ease: 'Back.easeOut',
+        yoyo: true, hold: 400,
+        onComplete: () => wcText.destroy(),
+      })
 
       if (this.currentWave >= this.levelData.waves.length && !this.endlessMode) {
         this.handleGameOver(true)
@@ -2536,6 +2596,16 @@ export class GameScene extends Phaser.Scene {
       this.comboGoldBonus += comboBonus
 
       this.gold += enemy.reward + comboBonus
+      // Gold gain HUD pulse
+      if (this.goldText) {
+        this.tweens.add({ targets: this.goldText, scaleX: { from: 1.3, to: 1 }, scaleY: { from: 1.3, to: 1 }, duration: 150 })
+      }
+      // Combo camera effects
+      if (comboMult === 5) {
+        this.cameras.main.flash(100, 255, 215, 0)
+      } else if (comboMult >= 10) {
+        this.cameras.main.shake(100, 0.003)
+      }
       this.enemiesKilled++
       if (enemy.boss) this.bossKilled = true
       if (towerType === 'scout') {
@@ -2950,8 +3020,13 @@ export class GameScene extends Phaser.Scene {
     try { if (enemy.hpBg && enemy.hpBg.active) enemy.hpBg.destroy() } catch (e) {}
     try { if (enemy.hpBar && enemy.hpBar.active) enemy.hpBar.destroy() } catch (e) {}
     try { if (enemy.namePlate) enemy.namePlate.destroy() } catch (e) {}
-    // Clear scout tower lastTarget references to prevent memory leaks
-    this.towers.forEach(t => { if (t.lastTarget === enemy) { t.lastTarget = null; t.stackCount = 0 } })
+    // Clear scout tower lastTarget references and streak text
+    this.towers.forEach(t => {
+      if (t.lastTarget === enemy) {
+        t.lastTarget = null; t.stackCount = 0
+        if (t._streakText) { t._streakText.destroy(); t._streakText = null }
+      }
+    })
     // Clear manual target if this enemy was targeted
     if (this.manualTarget === enemy) this.clearManualTarget()
     this.enemies = this.enemies.filter(e => e !== enemy)
@@ -3185,6 +3260,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.gemText.setText(`${this.gemsCollected}`)
     this.killText.setText(`\u2620 ${this.enemiesKilled}`)
+
+    // Combo display
+    if (this.comboText) {
+      if (this.comboCount >= 3) {
+        this.comboText.setText(`${this.comboCount}x COMBO`)
+        this.comboText.setAlpha(1)
+      } else {
+        this.comboText.setAlpha(0)
+      }
+    }
 
     // Update build panel affordability — gray out towers player can't afford
     if (this.buildIcons) {
