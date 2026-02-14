@@ -1248,9 +1248,7 @@ export class GameScene extends Phaser.Scene {
     // Scale proportionally to fit within tile (maintain aspect ratio to avoid distortion)
     const maxTowerSize = 58
     const tScale = maxTowerSize / Math.max(sprite.width, sprite.height)
-    // Placement bounce animation
-    sprite.setScale(0)
-    this.tweens.add({ targets: sprite, scaleX: tScale, scaleY: tScale, duration: 300, ease: 'Back.easeOut' })
+    sprite.setScale(tScale)
     this.towerGroup.add(sprite)
 
     const healthMult = 1 + (this.saveData.upgrades.towerHealthBoost || 0) * 0.2
@@ -3132,11 +3130,10 @@ export class GameScene extends Phaser.Scene {
     const save = loadSave()
     this.registry.set('gameState', { levelsUnlocked: save.levelsUnlocked })
 
-    // Overlay
+    // Overlay (non-interactive so buttons above it can receive clicks)
     const overlay = this.add.graphics().setDepth(50)
     overlay.fillStyle(0x000000, 0.7)
     overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height)
-    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, this.cameras.main.width, this.cameras.main.height), Phaser.Geom.Rectangle.Contains)
 
     const bgKey = won ? 'victory_bg' : 'gameover_bg'
     if (this.textures.exists(bgKey)) {
