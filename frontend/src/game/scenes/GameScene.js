@@ -1287,12 +1287,6 @@ export class GameScene extends Phaser.Scene {
     if (type === 'storm') this.stormTowersBuilt++
     if (type === 'winter') this.iceTowersBuilt++
 
-    // Placement animation — pop-in bounce
-    sprite.setScale(0)
-    this.tweens.add({
-      targets: sprite, scaleX: tScale, scaleY: tScale,
-      duration: 250, ease: 'Back.easeOut',
-    })
     // Dust puff at base
     const dustPuff = this.add.graphics().setDepth(3).setPosition(x, y + 20)
     dustPuff.fillStyle(0xccaa77, 0.4)
