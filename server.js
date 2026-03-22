@@ -6,12 +6,14 @@ require('dotenv').config();
 const db = require('./backend/db');
 const authRoutes = require('./backend/routes/authRoutes');
 const saveRoutes = require('./backend/routes/saveRoutes');
+const logger = require('./loggerMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
+app.use(logger);
 
 // Initialize TNT-specific tables only (prefixed to avoid conflicts with other apps)
 db.query(`
